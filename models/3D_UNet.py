@@ -89,4 +89,3 @@ class UNet3D(nn.Module):
 
 
 # model = UNet3D(in_channels=1, out_channels=1)
-# output = model(input_tensor)
