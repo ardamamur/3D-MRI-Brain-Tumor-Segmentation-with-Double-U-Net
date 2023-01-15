@@ -130,7 +130,6 @@ class BratsDataset(Dataset):
 def get_dataloader(
     dataset: torch.utils.data.Dataset,
     root: str,
-    phase: str,
     fold: int = 0,
     batch_size: int = 1,
     num_workers: int = 0,
@@ -139,27 +138,40 @@ def get_dataloader(
     ids = [d.split("_")[-1] for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
     train_ids, eval_ids = train_test_split(ids, test_size=0.2, random_state=42)
     val_ids, test_ids = train_test_split(eval_ids, test_size=0.1, random_state=42)
-    
-    if phase == "train":
-        patient_ids = train_ids
-    elif phase == "val":
-        patient_ids = val_ids
-    else:
-        patient_ids = test_ids
-    
-    dataset = dataset(root, patient_ids, phase)
-    dataloader = DataLoader(
-        dataset,
+
+    train_dataset = dataset(root, train_ids, "train")
+    train_dataloader = DataLoader(
+        train_dataset,
         batch_size=batch_size,
         num_workers=num_workers,
         pin_memory=True,
         shuffle=True,   
     )
-    return dataloader
+
+    val_dataset = dataset(root, val_ids, "val")
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        shuffle=True,   
+    )
+
+    test_dataset = dataset(root, test_ids, "test")
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        shuffle=True,   
+    )
+    
+
+    return train_dataloader, val_dataloader, test_dataloader
 
 def test_data_loader():
     root = "/content/gdrive/MyDrive/TUM/Courses/2022 W/ML3D/Project/dataset/train"
-    dataloader = get_dataloader(dataset=BratsDataset, root=root, phase='train', fold=0)
+    dataloader, _, _ = get_dataloader(dataset=BratsDataset, root=root, fold=0)
     print("len:", len(dataloader))
 
     data = next(iter(dataloader))
