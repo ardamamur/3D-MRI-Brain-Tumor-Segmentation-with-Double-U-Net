@@ -1,121 +1,105 @@
-"""
-author : ardamamur
-date : 03.01.2023
-"""
-import torch
-import torch.nn as nn
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import warnings
+warnings.simplefilter("ignore")
 
 
-class UNet3D(nn.Module):
-    def __init__(self, in_channels, out_channels, init_features=32):
-        super(UNet3D, self).__init__()
+class DoubleConv(nn.Module):
+    """(Conv3D -> BN -> ReLU) * 2"""
+    def __init__(self, in_channels, out_channels, num_groups=8):
+        super().__init__()
+        self.double_conv = nn.Sequential(
+            nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),
+            #nn.BatchNorm3d(out_channels),
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+            nn.ReLU(inplace=True),
 
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.init_features = init_features
+            nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),
+            #nn.BatchNorm3d(out_channels),
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+            nn.ReLU(inplace=True)
+          )
 
-        # Downsampling path
-        self.down_convs = nn.ModuleList()
-        self.down_convs.append(self.create_conv_block(self.in_channels, self.init_features))
-        self.down_convs.append(self.create_conv_block(self.init_features, self.init_features * 2))
-        self.down_convs.append(self.create_conv_block(self.init_features * 2, self.init_features * 4))
-        self.down_convs.append(self.create_conv_block(self.init_features * 4, self.init_features * 8))
+    def forward(self,x):
+        return self.double_conv(x)
 
-        # Upsampling path
-        self.up_convs = nn.ModuleList()
-        self.up_convs.append(self.create_conv_block(self.init_features * 8 + self.init_features * 4, self.init_features * 4))
-        self.up_convs.append(self.create_conv_block(self.init_features * 4 + self.init_features * 2, self.init_features * 2))
-        self.up_convs.append(self.create_conv_block(self.init_features * 2 + self.init_features, self.init_features))
+    
+class Down(nn.Module):
 
-        # Output layer
-        self.out_conv = nn.Conv3d(self.init_features, self.out_channels, kernel_size=1)
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.MaxPool3d(2, 2),
+            DoubleConv(in_channels, out_channels)
+        )
+    def forward(self, x):
+        return self.encoder(x)
 
-    def create_conv_block(self, in_channels, out_channels):
-        layers = [nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1), nn.BatchNorm3d(out_channels), nn.ReLU(inplace=True), nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1), nn.BatchNorm3d(out_channels), nn.ReLU(inplace=True)]
-        return nn.Sequential(*layers)
+    
+class Up(nn.Module):
+
+    def __init__(self, in_channels, out_channels, trilinear=True):
+        super().__init__()
+        
+        if trilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True)
+        else:
+            self.up = nn.ConvTranspose3d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2)
+            
+        self.conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+
+        diffZ = x2.size()[2] - x1.size()[2]
+        diffY = x2.size()[3] - x1.size()[3]
+        diffX = x2.size()[4] - x1.size()[4]
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2, diffZ // 2, diffZ - diffZ // 2])
+
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
+    
+class Out(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size = 1)
 
     def forward(self, x):
-        # Downsampling path
-        down_features = []
-        for i, down_conv in enumerate(self.down_convs):
-            x = down_conv(x)
-            if i != len(self.down_convs) - 1:
-                down_features.append(x)
-                x = nn.MaxPool3d(kernel_size=2, stride=2)(x)
+        return self.conv(x)
 
-        # Upsampling path
-        x = nn.ConvTranspose3d(self.init_features * 8, self.init_features * 4, kernel_size=2, stride=2)(x)
-        x = torch.cat([x, down_features.pop()], dim=1)
-        for i, up_conv in enumerate(self.up_convs):
-            x = up_conv(x)
-            if i != len(self.up_convs) - 1:
-                x = torch.cat([x, down_features.pop()], dim=1)
 
-        # Output layer
-        x = self.out_conv(x)
-
-        return x
-
-class NoNewNet(nn.Module):
-
-    def __init__(self, in_channels, out_channels, num_fmaps=32, fmap_inc_rule=lambda x: 2 ** x, depth=5):
-        super(UNet3D, self).__init__()
-
+class UNet3d(nn.Module):
+    def __init__(self, in_channels, n_classes, n_channels):
+        super().__init__()
         self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.num_fmaps = num_fmaps
-        self.fmap_inc_rule = fmap_inc_rule
-        self.depth = depth
-        self.down_convs = nn.ModuleList()
-        self.up_convs = nn.ModuleList()
-        self.down_pools = nn.ModuleList()
-        self.up_interpolates = nn.ModuleList()
-        self.merge_convs = nn.ModuleList()
-        self.out_convs = nn.ModuleList()
+        self.n_classes = n_classes
+        self.n_channels = n_channels
 
-        for i in range(depth):
-            #down convolutions
-            self.down_convs.append(nn.Sequential(
-                 nn.Conv3d(in_channels if i==0 else self.num_fmaps * self.fmap_inc_rule(i), self.num_fmaps * self.fmap_inc_rule(i+1), kernel_size=3, stride=1, padding=1, bias=False),
-                nn.BatchNorm3d(self.num_fmaps * self.fmap_inc_rule(i+1)),
-                nn.ReLU(inplace=True)
-            ))
-            #up convolutions
-            self.up_convs.append(nn.Sequential(
-                nn.Conv3d(self.num_fmaps * self.fmap_inc_rule(i), self.num_fmaps * self.fmap_inc_rule(i+1), kernel_size=3, stride=1, padding=1, bias=False),
-                nn.BatchNorm3d(self.num_fmaps * self.fmap_inc_rule(i+1)),
-                nn.ReLU(inplace=True)
-            ))
-            self.down_pools.append(nn.MaxPool3d(kernel_size=2))
-            self.up_interpolates.append(nn.Upsample(scale_factor=2, mode='nearest'))
-            # merge convolutions
-            self.merge_convs.append(nn.Sequential(
-                nn.Conv3d(self.num_fmaps * self.fmap_inc_rule(i) * 2, self.num_fmaps * self.fmap_inc_rule(i), kernel_size=1, bias=False),
-                nn.BatchNorm3d(self.num_fmaps * self.fmap_inc_rule(i)),
-                nn.ReLU(inplace=True)
-            ))
-            # output convolutions
-            if i == depth - 1:
-                self.out_convs.append(nn.Conv3d(self.num_fmaps * self.fmap_inc_rule(i), out_channels, kernel_size=1))
-            else:
-                self.out_convs.append(nn.Sequential(
-                    nn.Conv3d(self.num_fmaps * self.fmap_inc_rule(i), self.num_fmaps * self.fmap_inc_rule(i), kernel_size=1),
-                    nn.BatchNorm3d(self.num_fmaps * self.fmap_inc_rule(i)),
-                    nn.ReLU(inplace=True)
-                ))
+        self.conv = DoubleConv(in_channels, n_channels)
+        self.enc1 = Down(n_channels, 2 * n_channels)
+        self.enc2 = Down(2 * n_channels, 4 * n_channels)
+        self.enc3 = Down(4 * n_channels, 8 * n_channels)
+        self.enc4 = Down(8 * n_channels, 8 * n_channels)
+
+        self.dec1 = Up(16 * n_channels, 4 * n_channels)
+        self.dec2 = Up(8 * n_channels, 2 * n_channels)
+        self.dec3 = Up(4 * n_channels, n_channels)
+        self.dec4 = Up(2 * n_channels, n_channels)
+        self.out = Out(n_channels, n_classes)
 
     def forward(self, x):
-        down_features = []
-        for i in range(self.depth):
-            x = self.down_convs[i](x)
-            down_features.append(x)
-            x = self.down_pools[i](x)
-        for i in range(self.depth):
-            x = self.up_interpolates[i](x)
-            x = torch.cat([x, down_features[self.depth - i - 1]], dim=1)
-            x = self.merge_convs[i](x)
-            x = self.out_convs[i](x)
-        return x
+        x1 = self.conv(x)
+        x2 = self.enc1(x1)
+        x3 = self.enc2(x2)
+        x4 = self.enc3(x3)
+        x5 = self.enc4(x4)
+
+        mask = self.dec1(x5, x4)
+        mask = self.dec2(mask, x3)
+        mask = self.dec3(mask, x2)
+        mask = self.dec4(mask, x1)
+        mask = self.out(mask)
+        return mask

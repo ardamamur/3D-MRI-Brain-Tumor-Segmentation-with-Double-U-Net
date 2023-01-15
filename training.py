@@ -1,120 +1,246 @@
-from models.UNet import UNet3D, NoNewNet
-from models.utils import summarize_model
-from dataset.data_loader import *
-from pathlib import Path
+from tqdm import tqdm
+import os
+import time
+from random import randint
+
+import numpy as np
+from scipy import stats
+import pandas as pd
+
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+from sklearn.model_selection import KFold
+
+import nibabel as nib
+import pydicom as pdm
+import nilearn as nl
+import nilearn.plotting as nlplt
+import h5py
+
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.animation as anim
+import matplotlib.patches as mpatches
+import matplotlib.gridspec as gridspec
+
+import seaborn as sns
+import imageio
+from skimage.transform import resize
+from skimage.util import montage
+
+from IPython.display import Image as show_gif
+from IPython.display import clear_output
+from IPython.display import YouTubeVideo
+
 import torch
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.nn import functional as F
-#from loss_functions.crossentropy import *
-#from loss_functions.deep_supervision import *
-#from loss_functions.dice_loss import *
-#from loss_functions.focal_loss import *
-import datetime
-import pytz
-from datetime import timedelta
-today = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
-today = today.strftime("%m-%d-%Y-%H%M%S")
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 
-test_ids = None
+from torch.optim import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.nn import MSELoss
 
-def load_model(model_name):
+import albumentations
+import albumentations as A
+from albumentations import Compose, HorizontalFlip
+import warnings
+warnings.simplefilter("ignore")
+
+
+from dataset.data_loader import *
+from models.loss import *
+from models.UNet import *
+
+
+class Trainer:
     """
-    args:
-        model_name : name of the model class
-    return:
-        torch.model
+    Factory for training proccess.
+    Args:
+        display_plot: if True - plot train history after each epoch.
+        net: neural network for mask prediction.
+        criterion: factory for calculating objective loss.
+        optimizer: optimizer for weights updating.
+        phases: list with train and validation phases.
+        dataloaders: dict with data loaders for train and val phases.
+        root: path of the dataset.
+        meter: factory for storing and updating metrics.
+        batch_size: data batch size for one step weights updating.
+        num_epochs: num weights updation for all data.
+        accumulation_steps: the number of steps after which the optimization step can be taken
+                    (https://www.kaggle.com/c/understanding_cloud_organization/discussion/105614).
+        lr: learning rate for optimizer.
+        scheduler: scheduler for control learning rate.
+        losses: dict for storing lists with losses for each phase.
+        jaccard_scores: dict for storing lists with jaccard scores for each phase.
+        dice_scores: dict for storing lists with dice scores for each phase.
     """
+    def __init__(self,
+                 net: nn.Module,
+                 dataset: torch.utils.data.Dataset,
+                 criterion: nn.Module,
+                 lr: float,
+                 accumulation_steps: int,
+                 batch_size: int,
+                 fold: int,
+                 num_epochs: int,
+                 root : str,
+                 display_plot: bool = True,
+                ):
 
-    if model_name == "unet3d":
-        model = UNet3D(in_channels=960, out_channels=1)
-    elif model_name == "nonewnet":
-        model = NoNewNet(in_channels=960, out_channels=1)
-    else:
-        raise NotImplementedError
-    print(summarize_model(model))
-    return model
+        """Initialization."""
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print("device:", self.device)
+        self.display_plot = display_plot
+        self.net = net
+        self.net = self.net.to(self.device)
+        self.criterion = criterion
+        self.optimizer = Adam(self.net.parameters(), lr=lr)
+        self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min",
+                                           patience=2, verbose=True)
+        self.accumulation_steps = accumulation_steps // batch_size
+        self.phases = ["train", "val"]
+        self.num_epochs = num_epochs
 
-def train(model_name, data_path, num_epochs, batch_size, lr):
-
-    model = load_model(model_name)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    #criterion = SoftDiceLoss()
-    criterion = torch.nn.CrossEntropyLoss()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-
-    # Create datasets
-    patient_ids = [d.split("_")[-1] for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, d))]
-    train_ids, eval_ids = train_test_split(patient_ids, test_size=0.2, random_state=42)
-    val_ids, test_ids = train_test_split(eval_ids, test_size=0.1, random_state=42)
-    
-    train_dataset = BratsDataLoader(root=data_path, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=train_ids)
-    val_dataset = BratsDataLoader(root=data_path, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=val_ids)
-
-    # Create dataloaders
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
-    
-    # Initialize best validation loss to a large value
-    best_val_loss = float('inf')
-    best_model_state_dict = None
-    print("########## training starting ############")
-    for epoch in range(num_epochs):
-        # Training
-        model.train()
-        train_loss = 0.0
-        for i, data in enumerate(train_dataloader):
-            scans = data['scan'].to(device)
-            labels = data['segmentation'].to(device)
-
-            # Forward pass
-            outputs = model(scans)
-            loss = criterion(outputs, labels)
-
-            # Backward and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            train_loss += loss.item()
-        train_loss = train_loss / len(train_dataloader)
-
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for i, data in enumerate(val_dataloader):
-                scans = data['scan'].to(device)
-                labels = data['segmentation'].to(device)
-
-                # Forward pass
-                outputs = model(scans)
-                loss = criterion(outputs, labels)
-                val_loss += loss.item()
-        val_loss = val_loss / len(val_dataloader)
-
-        print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}')
+        self.dataloaders = {
+            phase: get_dataloader(
+                dataset = dataset,
+                root = root,
+                phase = phase,
+                fold = fold,
+                batch_size = batch_size,
+                num_workers = 4
+            )
+            for phase in self.phases
+        }
+        self.best_loss = float("inf")
+        self.losses = {phase: [] for phase in self.phases}
+        self.dice_scores = {phase: [] for phase in self.phases}
+        self.jaccard_scores = {phase: [] for phase in self.phases}
+         
+    def _compute_loss_and_outputs(self,
+                                  images: torch.Tensor,
+                                  targets: torch.Tensor):
+        images = images.to(self.device)
+        targets = targets.to(self.device)
+        logits = self.net(images)
+        loss = self.criterion(logits, targets)
+        return loss, logits
         
-        # Save best model based on validation loss
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_model_state_dict = model.state_dict()
-            best_model_path = "trained_models/" + today + "_best_model.pth"
-            torch.save(best_model_state_dict,best_model_path)
+    def _do_epoch(self, epoch: int, phase: str):
+        print(f"{phase} epoch: {epoch} | time: {time.strftime('%H:%M:%S')}")
 
-        print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}')
-    model.load_state_dict(best_model_state_dict)
+        self.net.train() if phase == "train" else self.net.eval()
+        meter = Meter()
+        dataloader = self.dataloaders[phase]
+        total_batches = len(dataloader)
+        running_loss = 0.0
+        self.optimizer.zero_grad()
+        for itr, data_batch in enumerate(dataloader):
+            images, targets = data_batch['image'], data_batch['mask']
+            loss, logits = self._compute_loss_and_outputs(images, targets)
+            loss = loss / self.accumulation_steps
+            if phase == "train":
+                loss.backward()
+                if (itr + 1) % self.accumulation_steps == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+            running_loss += loss.item()
+            meter.update(logits.detach().cpu(),
+                         targets.detach().cpu()
+                        )
+            
+        epoch_loss = (running_loss * self.accumulation_steps) / total_batches
+        epoch_dice, epoch_iou = meter.get_metrics()
+        
+        self.losses[phase].append(epoch_loss)
+        self.dice_scores[phase].append(epoch_dice)
+        self.jaccard_scores[phase].append(epoch_iou)
 
+        return epoch_loss
+        
+    def run(self):
+        for epoch in range(self.num_epochs):
+            self._do_epoch(epoch, "train")
+            with torch.no_grad():
+                val_loss = self._do_epoch(epoch, "val")
+                self.scheduler.step(val_loss)
+            if self.display_plot:
+                self._plot_train_history()
+                
+            if val_loss < self.best_loss:
+                print(f"\n{'#'*20}\nSaved new checkpoint\n{'#'*20}\n")
+                self.best_loss = val_loss
+                torch.save(self.net.state_dict(), "best_model.pth")
+            print()
+        self._save_train_history()
+            
+    def _plot_train_history(self):
+        data = [self.losses, self.dice_scores, self.jaccard_scores]
+        colors = ['deepskyblue', "crimson"]
+        labels = [
+            f"""
+            train loss {self.losses['train'][-1]}
+            val loss {self.losses['val'][-1]}
+            """,
+            
+            f"""
+            train dice score {self.dice_scores['train'][-1]}
+            val dice score {self.dice_scores['val'][-1]} 
+            """, 
+                  
+            f"""
+            train jaccard score {self.jaccard_scores['train'][-1]}
+            val jaccard score {self.jaccard_scores['val'][-1]}
+            """,
+        ]
+        
+        clear_output(True)
+        with plt.style.context("seaborn-dark-palette"):
+            fig, axes = plt.subplots(3, 1, figsize=(8, 10))
+            for i, ax in enumerate(axes):
+                ax.plot(data[i]['val'], c=colors[0], label="val")
+                ax.plot(data[i]['train'], c=colors[-1], label="train")
+                ax.set_title(labels[i])
+                ax.legend(loc="upper right")
+                
+            plt.tight_layout()
+            plt.show()
+            
+    def load_predtrain_model(self,
+                             state_path: str):
+        self.net.load_state_dict(torch.load(state_path))
+        print("Predtrain model loaded")
+        
+    def _save_train_history(self):
+        """writing model weights and training logs to files."""
+        torch.save(self.net.state_dict(),
+                   f"last_epoch_model.pth")
 
+        logs_ = [self.losses, self.dice_scores, self.jaccard_scores]
+        log_names_ = ["_loss", "_dice", "_jaccard"]
+        logs = [logs_[i][key] for i in list(range(len(logs_)))
+                         for key in logs_[i]]
+        log_names = [key+log_names_[i] 
+                     for i in list(range(len(logs_))) 
+                     for key in logs_[i]
+                    ]
+        pd.DataFrame(
+            dict(zip(log_names, logs))
+        ).to_csv("train_log.csv", index=False)
 
-if __name__ == "__main__":
-
-    model_name = "unet3d"
-    data_path = "/home/ardamamur/TUM/ML3D/dataset/train"
-    num_epochs = 5
-    batch_size = 8
-    lr = 1e-4
-    train(model_name=model_name, data_path=data_path, num_epochs=num_epochs, batch_size=batch_size, lr=lr)
-    print("########## training done ################")
+def main():
+    root = "/home/ardamamur/TUM/ML3D/dataset/train"
+    model = UNet3d(in_channels=4, n_classes=3, n_channels=24).to('cuda')
+    trainer = Trainer(net=model,
+                  dataset=BratsDataset,
+                  criterion=BCEDiceLoss(),
+                  lr=5e-4,
+                  accumulation_steps=4,
+                  batch_size=8,
+                  fold=0,
+                  num_epochs=5,
+                  root = root)
+    trainer.run()

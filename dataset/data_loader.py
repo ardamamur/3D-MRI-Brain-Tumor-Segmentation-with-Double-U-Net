@@ -1,121 +1,176 @@
+# ABOUT DATASET
+"""
+All BraTS multimodal scans are available as NIfTI files (.nii.gz) and describe 
+a) native (T1)
+b) post-contrast T1-weighted (T1ce), 
+c) T2-weighted (T2)
+d) T2 Fluid Attenuated Inversion Recovery (FLAIR) volumes.
+
+Annotations comprise the GD-enhancing tumor (ET — label 4), 
+the peritumoral edema (ED — label 2), and the necrotic and non-enhancing tumor core (NCR/NET — label 1).
+"""
+# TO-DO
+"""
+Each pixel must be labeled “1” if it is part of one of the classes (NCR/NET — label 1, ED — label 2, ET — label 4),
+and “0” if not.
+"""
+
+# IMPORT LIBRARIES
+from tqdm import tqdm
 import os
-import torch
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import albumentations as A
+import time
 import numpy as np
-import nibabel as nib # to load and save neuroimaging data
 from sklearn.model_selection import train_test_split
+import nibabel as nib
+from skimage.transform import resize
+import torch
+from torch.utils.data import Dataset, DataLoader
+import albumentations as A
+from albumentations import Compose, HorizontalFlip
+import warnings
+warnings.simplefilter("ignore")
 
-class ImageReader:
-    """
-    ImageReader class. The load_patient_scan method of the ImageReader class reads in all the scan types 
-    specified in scan_types and concatenates them along the channel dimension before returning them.
+def get_augmentations(phase):
+    list_transforms = []
     
-    Note:
-        A common approach is to train a model using all the modalities, 
-        concatenating the different modalities along the channel dimension of the input tensor. 
-        This allows the model to take advantage of the information provided by each modality.
-    """
-    def __init__(self, root:str, img_size:int=256, normalize:bool=False, single_class:bool=False, scan_types:list=['flair', 't1', 't1ce', 't2']):
-        self.scan_types = scan_types
-        self.pad_size = 256 if img_size > 256 else 224
-        self.resize = A.Compose(
-            [
-                A.PadIfNeeded(min_height=self.pad_size, min_width=self.pad_size, value=0),
-                A.Resize(img_size, img_size)
-            ]
-        )
-        self.normalize=normalize
-        self.single_class=single_class
-        self.root=root
-        
-    def read_file(self, path:str) -> dict:
-        raw_image = nib.load(path).get_fdata()
-        raw_mask = nib.load(path.replace(path.split('_')[-1], 'seg.nii.gz')).get_fdata()
-        processed_frames, processed_masks = [], []
-        for frame_idx in range(raw_image.shape[2]):
-            frame = raw_image[:, :, frame_idx]
-            mask = raw_mask[:, :, frame_idx]
-            if self.normalize:
-                if frame.max() > 0:
-                    frame = frame/frame.max()
-                frame = frame.astype(np.float32)
-            else:
-                frame = frame.astype(np.uint8)
-            resized = self.resize(image=frame, mask=mask)
-            processed_frames.append(resized['image'])
-            processed_masks.append(1*(resized['mask'] > 0) if self.single_class else resized['mask'])
-        return {
-            'scan': np.stack(processed_frames, 0),
-            'segmentation': np.stack(processed_masks, 0),
-            'orig_shape': raw_image.shape
-        }
-    
-    def load_patient_scan(self, idx:int, segmentation:np.ndarray) -> dict:
-        patient_id = str(idx).zfill(5)
-        scan_list = []
-        for scan_type in self.scan_types:
-            scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_{scan_type}.nii.gz'
-            scan_list.append(nib.load(scan_filename).get_fdata())
-        return {
-            'scan': np.concatenate(scan_list, axis=0),
-            'segmentation': segmentation,
-            'orig_shape': scan_list[0].shape
-        }
+    list_trfms = Compose(list_transforms)
+    return list_trfms
 
-class BratsDataLoader(Dataset):
-    """
-    BratsDataLoader class takes the same arguments as the previous version, 
-    but it also takes an additional argument scan_types, which is passed to the ImageReader class. 
-    The load_patient_scan method of the ImageReader class reads in all the scan types specified in scan_types 
-    and concatenates them along the channel dimension before returning them.
-    """
-    def __init__(self, root:str, img_size:int=256, normalize:bool=False, single_class:bool=False, scan_types:list=['flair', 't1', 't1gd', 't2'], patient_ids=None):
-        self.image_reader = ImageReader(root, img_size, normalize, single_class, scan_types)
+class BratsDataset(Dataset):
+    def __init__(self, root, patient_ids, phase, is_resize: bool=False):
         self.root = root
         self.patient_ids = patient_ids
-
+        self.phase = phase
+        self.augmentations = get_augmentations(phase)
+        self.scan_types = ['flair', 't1', 't1ce', 't2']
+        self.is_resize = is_resize
+        
     def __len__(self):
         return len(self.patient_ids)
     
     def __getitem__(self, idx):
         patient_id = self.patient_ids[idx]
-        scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
-        segmentation = nib.load(scan_filename).get_fdata()
-        #print(segmentation)
-        patient_data = self.image_reader.load_patient_scan(patient_id, segmentation)
-        scan = patient_data['scan']
-        #print(scan)
-        segmentation = patient_data['segmentation']
-        return {'scan': torch.from_numpy(scan), 'segmentation': torch.from_numpy(segmentation)}
+        id_ = patient_id
+        # load all modalities
+        images = []
+        for scan_type in self.scan_types:
+            img_path = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_{scan_type}.nii.gz'
+            img = self.load_img(img_path) #.transpose(2, 0, 1)
+            
+            if self.is_resize:
+                img = self.resize(img)
+    
+            img = self.normalize(img)
+            images.append(img)
+        img = np.stack(images)
+        img = np.moveaxis(img, (0, 1, 2, 3), (0, 3, 2, 1))
+        
+        if self.phase != "test":
+            mask_path =  f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
+            mask = self.load_img(mask_path)
+            
+            if self.is_resize:
+                mask = self.resize(mask)
+                mask = np.clip(mask.astype(np.uint8), 0, 1).astype(np.float32)
+                mask = np.clip(mask, 0, 1)
+            mask = self.preprocess_mask_labels(mask)
+    
+            augmented = self.augmentations(image=img.astype(np.float32), 
+                                           mask=mask.astype(np.float32))
+            
+            img = augmented['image']
+            mask = augmented['mask']
+        
+            return {
+                "Id": id_,
+                "image": img,
+                "mask": mask,
+            }
+        
+        return {
+            "Id": id_,
+            "image": img,
+        }
+    
+    def load_img(self, file_path):
+        data = nib.load(file_path)
+        data = np.asarray(data.dataobj)
+        return data
+    
+    def normalize(self, data: np.ndarray):
+        data_min = np.min(data)
+        return (data - data_min) / (np.max(data) - data_min)
+    
+    def resize(self, data: np.ndarray):
+        data = resize(data, (78, 120, 120), preserve_range=True)
+        return data
+    
+    def preprocess_mask_labels(self, mask: np.ndarray):
 
+        mask_WT = mask.copy()
+        mask_WT[mask_WT == 1] = 1
+        mask_WT[mask_WT == 2] = 1
+        mask_WT[mask_WT == 4] = 1
 
+        mask_TC = mask.copy()
+        mask_TC[mask_TC == 1] = 1
+        mask_TC[mask_TC == 2] = 0
+        mask_TC[mask_TC == 4] = 1
 
-def test_data_loader(dataset):
+        mask_ET = mask.copy()
+        mask_ET[mask_ET == 1] = 0
+        mask_ET[mask_ET == 2] = 0
+        mask_ET[mask_ET == 4] = 1
 
-    patient_ids = [d.split("_")[-1] for d in os.listdir(dataset) if os.path.isdir(os.path.join(dataset, d))]
-    train_ids, eval_ids = train_test_split(patient_ids, test_size=0.2, random_state=42)
+        mask = np.stack([mask_WT, mask_TC, mask_ET])
+        mask = np.moveaxis(mask, (0, 1, 2, 3), (0, 3, 2, 1))
+
+        return mask
+
+def get_dataloader(
+    dataset: torch.utils.data.Dataset,
+    root: str,
+    phase: str,
+    fold: int = 0,
+    batch_size: int = 1,
+    num_workers: int = 0,
+):
+
+    ids = [d.split("_")[-1] for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
+    train_ids, eval_ids = train_test_split(ids, test_size=0.2, random_state=42)
     val_ids, test_ids = train_test_split(eval_ids, test_size=0.1, random_state=42)
+    
+    if phase == "train":
+        patient_ids = train_ids
+    elif phase == "val":
+        patient_ids = val_ids
+    else:
+        patient_ids = test_ids
+    
+    dataset = dataset(root, patient_ids, phase)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        shuffle=True,   
+    )
+    return dataloader
 
+def test_data_loader():
+    root = "/home/ardamamur/TUM/ML3D/dataset/train"
+    dataloader = get_dataloader(dataset=BratsDataset, root=root, phase='train', fold=0)
+    print("len:", len(dataloader))
 
-    data_loader = DataLoader(BratsDataLoader(root=dataset, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=train_ids),
-                         batch_size=16, shuffle=True, num_workers=0)
+    data = next(iter(dataloader))
+    print("patient_id:", data['Id'])
+    print("scan_image:",data['image'].shape)
+    print("segmentation:", data['mask'].shape)
 
-    data = next(iter(data_loader))
+    img_tensor = data['image'].squeeze()[0].cpu().detach().numpy() 
+    mask_tensor = data['mask'].squeeze()[0].squeeze().cpu().detach().numpy()
+    print("Num uniq Image values :", len(np.unique(img_tensor, return_counts=True)[0]))
+    print("Min/Max Image values:", img_tensor.min(), img_tensor.max())
+    print("Num uniq Mask values:", np.unique(mask_tensor, return_counts=True))
 
-    # Check the shape of the data
-    scan = data['scan']
-    segmentation = data['segmentation']
-    print("Shape of scan: ", scan.shape)
-    print("Shape of segmentation: ", segmentation.shape)
-
-    # Check the data type of the data
-    print("Data type of scan: ", scan.dtype)
-    print("Data type of segmentation: ", segmentation.dtype)
-
-
-root = "/home/ardamamur/TUM/ML3D/dataset/"
-dataset = root + "train"
-test_data_loader(dataset)
+test_data_loader()
