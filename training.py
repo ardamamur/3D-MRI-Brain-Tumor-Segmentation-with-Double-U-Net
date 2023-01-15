@@ -2,21 +2,22 @@ from models.UNet import UNet3D, NoNewNet
 from models.utils import summarize_model
 from dataset.data_loader import *
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
-from loss_functions.crossentropy import *
-from loss_functions.deep_supervision import *
-from loss_functions.dice_loss import *
-from loss_functions.focal_loss import *
+#from loss_functions.crossentropy import *
+#from loss_functions.deep_supervision import *
+#from loss_functions.dice_loss import *
+#from loss_functions.focal_loss import *
 import datetime
 import pytz
 from datetime import timedelta
 today = datetime.datetime.now(pytz.timezone("Europe/Berlin"))
 today = today.strftime("%m-%d-%Y-%H%M%S")
 
-
+test_ids = None
 
 def load_model(model_name):
     """
@@ -39,14 +40,18 @@ def train(model_name, data_path, num_epochs, batch_size, lr):
 
     model = load_model(model_name)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = SoftDiceLoss()
-    
+    #criterion = SoftDiceLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     # Create datasets
-    train_dataset = BratsDataLoader(root_dir=data_path, split='train')
-    val_dataset = BratsDataLoader(root_dir=data_path, split='val')
+    patient_ids = [d.split("_")[-1] for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, d))]
+    train_ids, eval_ids = train_test_split(patient_ids, test_size=0.2, random_state=42)
+    val_ids, test_ids = train_test_split(eval_ids, test_size=0.1, random_state=42)
+    
+    train_dataset = BratsDataLoader(root=data_path, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=train_ids)
+    val_dataset = BratsDataLoader(root=data_path, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=val_ids)
 
     # Create dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)

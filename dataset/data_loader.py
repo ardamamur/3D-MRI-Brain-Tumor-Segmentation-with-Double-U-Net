@@ -6,6 +6,7 @@ from torchvision import transforms
 import albumentations as A
 import numpy as np
 import nibabel as nib # to load and save neuroimaging data
+from sklearn.model_selection import train_test_split
 
 class ImageReader:
     """
@@ -71,47 +72,35 @@ class BratsDataLoader(Dataset):
     The load_patient_scan method of the ImageReader class reads in all the scan types specified in scan_types 
     and concatenates them along the channel dimension before returning them.
     """
-    def __init__(self, root:str, img_size:int=256, normalize:bool=False, single_class:bool=False, scan_types:list=['flair', 't1', 't1gd', 't2']):
+    def __init__(self, root:str, img_size:int=256, normalize:bool=False, single_class:bool=False, scan_types:list=['flair', 't1', 't1gd', 't2'], patient_ids=None):
         self.image_reader = ImageReader(root, img_size, normalize, single_class, scan_types)
         self.root = root
-        self.patient_ids = [d.split("_")[-1] for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
-        
+        self.patient_ids = patient_ids
+
     def __len__(self):
         return len(self.patient_ids)
     
     def __getitem__(self, idx):
         patient_id = self.patient_ids[idx]
-        if self.split == 'train':
-            if idx < int(0.8*len(self.patient_ids)):
-                scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
-                segmentation = nib.load(scan_filename).get_fdata()
-                patient_data = self.image_reader.load_patient_scan(patient_id, segmentation)
-                scan = patient_data['scan']
-                segmentation = patient_data['segmentation']
-                return {'scan': torch.from_numpy(scan), 'segmentation': torch.from_numpy(segmentation)}
-        if self.split == 'val':
-            if int(0.8*len(self.patient_ids)) <= idx < int(0.9*len(self.patient_ids)):
-                scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
-                segmentation = nib.load(scan_filename).get_fdata()
-                patient_data = self.image_reader.load_patient_scan(patient_id, segmentation)
-                scan = patient_data['scan']
-                segmentation = patient_data['segmentation']
-                return {'scan': torch.from_numpy(scan), 'segmentation': torch.from_numpy(segmentation)}
-        if self.split == 'test':
-            if idx >= int(0.9*len(self.patient_ids)):
-                scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
-                segmentation = nib.load(scan_filename).get_fdata()
-                patient_data = self.image_reader.load_patient_scan(patient_id, segmentation)
-                scan = patient_data['scan']
-                segmentation = patient_data['segmentation']
-                return {'scan': torch.from_numpy(scan), 'segmentation': torch.from_numpy(segmentation)}
+        scan_filename = f'{self.root}/BraTS2021_{patient_id}/BraTS2021_{patient_id}_seg.nii.gz'
+        segmentation = nib.load(scan_filename).get_fdata()
+        #print(segmentation)
+        patient_data = self.image_reader.load_patient_scan(patient_id, segmentation)
+        scan = patient_data['scan']
+        #print(scan)
+        segmentation = patient_data['segmentation']
+        return {'scan': torch.from_numpy(scan), 'segmentation': torch.from_numpy(segmentation)}
 
 
-def test_data_loader(root_path):
-    # root = "/home/ardamamur/TUM/ML3D/dataset/"
-    dataset = root_path + "train"
-    labels = root_path + "train_labels.csv"
-    data_loader = DataLoader(BratsDataLoader(root=dataset, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2']),
+
+def test_data_loader(dataset):
+
+    patient_ids = [d.split("_")[-1] for d in os.listdir(dataset) if os.path.isdir(os.path.join(dataset, d))]
+    train_ids, eval_ids = train_test_split(patient_ids, test_size=0.2, random_state=42)
+    val_ids, test_ids = train_test_split(eval_ids, test_size=0.1, random_state=42)
+
+
+    data_loader = DataLoader(BratsDataLoader(root=dataset, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2'], patient_ids=train_ids),
                          batch_size=16, shuffle=True, num_workers=0)
 
     data = next(iter(data_loader))
@@ -126,26 +115,7 @@ def test_data_loader(root_path):
     print("Data type of scan: ", scan.dtype)
     print("Data type of segmentation: ", segmentation.dtype)
 
-"""
-# Test the dataloader
 
 root = "/home/ardamamur/TUM/ML3D/dataset/"
 dataset = root + "train"
-labels = root + "train_labels.csv"
-
-data_loader = DataLoader(BratsDataLoader(root=dataset, img_size=256, normalize=True, single_class=True, scan_types=['flair', 't1', 't1ce', 't2']),
-                         batch_size=16, shuffle=True, num_workers=0)
-
-# Get a batch of data
-data = next(iter(data_loader))
-
-# Check the shape of the data
-scan = data['scan']
-segmentation = data['segmentation']
-print("Shape of scan: ", scan.shape)
-print("Shape of segmentation: ", segmentation.shape)
-
-# Check the data type of the data
-print("Data type of scan: ", scan.dtype)
-print("Data type of segmentation: ", segmentation.dtype)
-"""
+test_data_loader(dataset)
