@@ -231,16 +231,17 @@ class Trainer:
             dict(zip(log_names, logs))
         ).to_csv("train_log.csv", index=False)
 
-def main():
-    root = "/home/ardamamur/TUM/ML3D/dataset/train"
-    model = UNet3d(in_channels=4, n_classes=3, n_channels=24).to('cuda')
-    trainer = Trainer(net=model,
-                  dataset=BratsDataset,
-                  criterion=BCEDiceLoss(),
-                  lr=5e-4,
-                  accumulation_steps=4,
-                  batch_size=8,
-                  fold=0,
-                  num_epochs=5,
-                  root = root)
-    trainer.run()
+
+root = "/home/ardamamur/TUM/ML3D/dataset/train"
+model = UNet3d(in_channels=4, n_classes=3, n_channels=24).to('cuda')
+trainer = Trainer(net=model,
+                dataset=BratsDataset,
+                criterion=BCEDiceLoss(),
+                lr=5e-4,
+                accumulation_steps=4,
+                batch_size=8,
+                fold=0,
+                num_epochs=5,
+                root = root)
+trainer.run()
+
