@@ -154,6 +154,12 @@ class Trainer:
             
         epoch_loss = (running_loss * self.accumulation_steps) / total_batches
         epoch_dice, epoch_iou = meter.get_metrics()
+
+        if phase=="train":
+          print("train_loss:", epoch_loss, " dice:", epoch_dice, " iou:", epoch_iou)
+        else:
+          print("val_loss:", epoch_loss, " dice:", epoch_dice, " iou:", epoch_iou)
+
         
         self.losses[phase].append(epoch_loss)
         self.dice_scores[phase].append(epoch_dice)

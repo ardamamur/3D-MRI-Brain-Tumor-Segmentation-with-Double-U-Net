@@ -37,7 +37,7 @@ def get_augmentations(phase):
     return list_trfms
 
 class BratsDataset(Dataset):
-    def __init__(self, root, patient_ids, phase, is_resize: bool=False):
+    def __init__(self, root, patient_ids, phase, is_resize: bool=True):
         self.root = root
         self.patient_ids = patient_ids
         self.phase = phase
