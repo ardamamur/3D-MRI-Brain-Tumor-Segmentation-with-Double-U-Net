@@ -6,6 +6,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 import random
+import warnings
+warnings.filterwarnings('ignore')
 
 class Brats2021(Dataset):
 
@@ -143,7 +145,7 @@ def make_data_loaders(params):
 if __name__ == "__main__":
     import configparser
     config = configparser.ConfigParser()
-    config.read('../config.ini')
+    config.read('config.ini')
     params = config['params']
 
     #modes = params['modes'].split(",")
