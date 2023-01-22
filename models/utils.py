@@ -1,4 +1,5 @@
 import numpy as np
+
 def summarize_model(model):
     layers = [(name if len(name) > 0 else 'TOTAL', str(module.__class__.__name__), sum(np.prod(p.shape) for p in module.parameters())) for name, module in model.named_modules()]
     layers.append(layers[0])

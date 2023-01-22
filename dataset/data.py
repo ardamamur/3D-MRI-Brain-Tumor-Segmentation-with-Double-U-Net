@@ -123,7 +123,11 @@ def split_dataset(data_root):
     print(f"train patients: {len(train_patients_list)}, test patients: {len(val_patients_list)}")
     return train_patients_list, val_patients_list
 
-def make_data_loaders(params):
+def make_data_loaders():
+    import configparser
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    params = config['params']
     modes = params['modes'].split(",")
     shapes = params['input_shape'].split(",")
     input_shape = (int(shapes[0]), int(shapes[1]), int(shapes[2]))
@@ -136,7 +140,7 @@ def make_data_loaders(params):
                                   num_workers=int(params['num_workers']),
                                   pin_memory=True,
                                   shuffle=True)
-    loaders['eval'] = DataLoader(val_ds, batch_size=int(params['batch_size']),
+    loaders['val'] = DataLoader(val_ds, batch_size=int(params['batch_size']),
                                   num_workers=int(params['num_workers']),
                                   pin_memory=True,
                                   shuffle=False)
@@ -157,12 +161,15 @@ def main():
     #train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, train=True)
     #val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, train=False)
     
-    loaders = make_data_loaders(params)
+    loaders = make_data_loaders()
     train_loader = loaders['train']
     print(len(train_loader))
     input_image, mask = next(iter(train_loader))
+    #print(np.unique(mask))
     print(input_image.shape)
     print(mask.shape)
     #train_list, val_list = split_dataset(cfg.DATASET.DATA_ROOT, cfg.DATASET.NUM_FOLDS, cfg.DATASET.SELECT_FOLD)
     #train_ds = Brats2018(train_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=True)
     #val_ds = Brats2018(val_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=False)
+
+#main()
