@@ -1,5 +1,5 @@
-import glob
 import os
+import glob
 import numpy as np
 import nibabel as nib
 import torch
@@ -142,7 +142,7 @@ def make_data_loaders(params):
                                   shuffle=False)
     return loaders
 
-if __name__ == "__main__":
+def main():
     import configparser
     config = configparser.ConfigParser()
     config.read('config.ini')
