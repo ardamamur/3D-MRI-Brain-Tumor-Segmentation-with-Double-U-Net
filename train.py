@@ -81,9 +81,7 @@ class Train():
             with torch.no_grad():
                 val_loss = self._do_epoch(epoch, "val")
                 self.scheduler.step(val_loss)
-            if self.display_plot:
-                self._plot_train_history()
-                
+                                
             if val_loss < self.best_loss:
                 print(f"\n{'#'*20}\nSaved new checkpoint\n{'#'*20}\n")
                 self.best_loss = val_loss
