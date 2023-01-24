@@ -172,7 +172,9 @@ class VariationalDecoder(nn.Module):
 
     def forward(self, x):
         z_params = self.param_layer(x)
-        z_sampled = self._reparametrize(z_params[:self.in_channels], z_params[self.in_channels:])
+        mu = z_params[:, :self.in_channels]
+        logvar = z_params[:, self.in_channels:]
+        z_sampled = self._reparametrize(mu, logvar)
 
         x_new = self.reprojection_layer(z_sampled)
         x_new = self.up1(x_new)
@@ -186,4 +188,4 @@ class VariationalDecoder(nn.Module):
 
         x_reconstructed = self.last_conv(x_new)
 
-        return x_reconstructed
+        return x_reconstructed, mu, logvar
