@@ -1247,6 +1247,49 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "monai"
+version = "1.1.0"
+description = "AI Toolkit for Healthcare Imaging"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+numpy = ">=1.17"
+torch = ">=1.8"
+
+[package.extras]
+all = ["cucim (>=22.8.1)", "einops", "fire", "gdown (>=4.4.0)", "h5py", "imagecodecs", "itk (>=5.2)", "jsonschema", "lmdb", "matplotlib", "mlflow", "nibabel", "ninja", "nni", "openslide-python (==1.1.2)", "optuna", "pandas", "pillow", "psutil", "pydicom", "pynrrd", "pytorch-ignite (==0.4.10)", "pyyaml", "scikit-image (>=0.14.2)", "tensorboard", "tensorboardX", "tifffile", "torchvision", "tqdm (>=4.47.0)", "transformers (<4.22)"]
+cucim = ["cucim (>=22.8.1)"]
+einops = ["einops"]
+fire = ["fire"]
+gdown = ["gdown (>=4.4.0)"]
+h5py = ["h5py"]
+ignite = ["pytorch-ignite (==0.4.10)"]
+imagecodecs = ["imagecodecs"]
+itk = ["itk (>=5.2)"]
+jsonschema = ["jsonschema"]
+lmdb = ["lmdb"]
+matplotlib = ["matplotlib"]
+mlflow = ["mlflow"]
+nibabel = ["nibabel"]
+ninja = ["ninja"]
+openslide = ["openslide-python (==1.1.2)"]
+pandas = ["pandas"]
+pillow = ["pillow (!=8.3.0)"]
+psutil = ["psutil"]
+pydicom = ["pydicom"]
+pynrrd = ["pynrrd"]
+pyyaml = ["pyyaml"]
+skimage = ["scikit-image (>=0.14.2)"]
+tensorboard = ["tensorboard"]
+tensorboardx = ["tensorboardX"]
+tifffile = ["tifffile"]
+torchvision = ["torchvision"]
+tqdm = ["tqdm (>=4.47.0)"]
+transformers = ["transformers (<4.22)"]
+
+[[package]]
 name = "multidict"
 version = "6.0.4"
 description = "multidict implementation"
@@ -2456,7 +2499,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.8.10"
-content-hash = "fdc53ff947321bf8091cd019d6e0e43a392c00be2c395e775783dc578f1f3fce"
+content-hash = "4f39737b2528557ec23d4d4f007e9d498ea960e12606d75cf4d2f939e67e9d14"
 
 [metadata.files]
 aiofiles = [
@@ -3223,6 +3266,9 @@ mdurl = [
 mistune = [
     {file = "mistune-2.0.4-py2.py3-none-any.whl", hash = "sha256:182cc5ee6f8ed1b807de6b7bb50155df7b66495412836b9a74c8fbdfc75fe36d"},
     {file = "mistune-2.0.4.tar.gz", hash = "sha256:9ee0a66053e2267aba772c71e06891fa8f1af6d4b01d5e84e267b4570d4d9808"},
+]
+monai = [
+    {file = "monai-1.1.0-202212191849-py3-none-any.whl", hash = "sha256:28b47fc552309f1974a347fca6771969f25e98c228ef3a53a62eae250f3c0b8d"},
 ]
 multidict = [
     {file = "multidict-6.0.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0b1a97283e0c85772d613878028fec909f003993e1007eafa715b24b377cb9b8"},
