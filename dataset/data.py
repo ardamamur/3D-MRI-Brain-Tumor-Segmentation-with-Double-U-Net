@@ -134,10 +134,10 @@ def split_dataset(data_root):
     n_patients = len(patients_dir)
     print(f"total patients: {n_patients}")
     train_patients_list, val_patients_list = train_test_split(patients_dir, test_size=0.20, random_state=42)
-    print(f"train patients: {len(train_patients_list)}, test patients: {len(val_patients_list)}")
+    print(f"train patients: {len(train_patients_list)}, val patients: {len(val_patients_list)}")
     return train_patients_list, val_patients_list
 
-def make_data_loaders():
+def make_data_loaders(mode:str):
     import configparser
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -145,19 +145,33 @@ def make_data_loaders():
     modes = params['modes'].split(",")
     shapes = params['input_shape'].split(",")
     input_shape = (int(shapes[0]), int(shapes[1]), int(shapes[2]))
-    data_root = params['data_root']
-    train_list, val_list = split_dataset(data_root=data_root)
-    train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train")
-    val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val")
     loaders = {}
-    loaders['train'] = DataLoader(train_ds, batch_size=int(params['batch_size']),
-                                  num_workers=int(params['num_workers']),
-                                  pin_memory=True,
-                                  shuffle=True)
-    loaders['val'] = DataLoader(val_ds, batch_size=int(params['batch_size']),
-                                  num_workers=int(params['num_workers']),
-                                  pin_memory=True,
-                                  shuffle=False)
+    if not mode == "test":
+        data_root = params['train_dataset']
+        train_list, val_list = split_dataset(data_root=data_root)
+        train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train")
+        val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val")
+        loaders = {}
+        loaders['train'] = DataLoader(train_ds, batch_size=int(params['batch_size']),
+                                    num_workers=int(params['num_workers']),
+                                    pin_memory=True,
+                                    shuffle=True)
+        loaders['val'] = DataLoader(val_ds, batch_size=int(params['batch_size']),
+                                    num_workers=int(params['num_workers']),
+                                    pin_memory=True,
+                                    shuffle=False)
+    else:
+        data_root = params['test_dataset']
+        test_list = glob.glob(os.path.join(data_root, "BraTS2021*"))
+        n_patients = len(test_list)
+        print(f"test patients: {n_patients}")
+        test_ds = Brats2021(test_list, crop_size=input_shape, modes=modes, dataset="test")
+        loaders = {}
+        loaders['test'] = DataLoader(test_ds, batch_size=int(params['batch_size']),
+                                    num_workers=int(params['num_workers']),
+                                    pin_memory=True,
+                                    shuffle=True)
+
     return loaders
 
 def main():
@@ -175,15 +189,15 @@ def main():
     #train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, train=True)
     #val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, train=False)
     
-    loaders = make_data_loaders()
-    train_loader = loaders['train']
-    print(len(train_loader))
-    input_image, mask = next(iter(train_loader))
+    loaders = make_data_loaders(mode="test")
+    test_loader = loaders['test']
+    print(len(test_loader))
+    input_image = next(iter(test_loader))
     #print(np.unique(mask))
     print(input_image.shape)
-    print(mask.shape)
+    #print(mask.shape)
     #train_list, val_list = split_dataset(cfg.DATASET.DATA_ROOT, cfg.DATASET.NUM_FOLDS, cfg.DATASET.SELECT_FOLD)
     #train_ds = Brats2018(train_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=True)
     #val_ds = Brats2018(val_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=False)
 
-#main()
+main()

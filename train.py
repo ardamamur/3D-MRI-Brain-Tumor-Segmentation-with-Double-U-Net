@@ -27,7 +27,7 @@ class Train():
         self.phases = ["train", "val"]
         self.num_epochs = hyper_parameters["num_epochs"]
         self.accumulation_steps = hyper_parameters['accumulation_steps']
-        self.loaders = make_data_loaders()
+        self.loaders = make_data_loaders(mode="train")
         self.best_loss = float("inf")
         self.n_steps = hyper_parameters['n_steps']
         self.losses = {phase: [] for phase in self.phases}
