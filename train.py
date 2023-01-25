@@ -63,11 +63,11 @@ class Train():
             running_loss += loss.item()
             meter.update(logits.detach().cpu(),targets.detach().cpu())
             if (itr + 1) % self.n_steps == 0:
-                print("BCEDice loss: ", loss.item())
+                print("loss: ", loss.item())
         
         epoch_loss = (running_loss * self.accumulation_steps) / total_batches
         epoch_dice, epoch_iou = meter.get_metrics()
-        print("Epoch loss: ", epoch_loss, ", Dice loss: ", epoch_dice, ", IoU loss: " , epoch_iou )
+        print("Accumulated loss: ", epoch_loss, ", Dice loss: ", epoch_dice, ", IoU loss: " , epoch_iou )
         self.losses[phase].append(epoch_loss)
         self.dice_scores[phase].append(epoch_dice)
         self.jaccard_scores[phase].append(epoch_iou)
@@ -130,7 +130,7 @@ def main():
         "shapes" : shapes,
         "num_epochs" : int(params['num_epochs']),
         "input_shape" : (int(shapes[0]), int(shapes[1]), int(shapes[2])),
-        "accumulation_steps" : 4 / int(params['batch_size']),
+        "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
         "n_steps" : 5
     
     }
