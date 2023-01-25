@@ -5,16 +5,17 @@ import nibabel as nib
 import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
+import skimage.transform as skTrans
 import random
 import warnings
 warnings.filterwarnings('ignore')
 
 class Brats2021(Dataset):
 
-    def __init__(self, patients_dir, crop_size, modes, train=True):
+    def __init__(self, patients_dir, crop_size, modes, dataset:str=None):
         self.patients_dir = patients_dir
         self.modes = modes # scan_types
-        self.train = train # boolean
+        self.dataset = dataset
         self.crop_size = crop_size
 
     def __len__(self):
@@ -23,40 +24,52 @@ class Brats2021(Dataset):
     def __getitem__(self, index):
         patient_dir = self.patients_dir[index]
         volumes = []
-        modes = list(self.modes) + ['seg'] # scan_types + seg
+        if not self.dataset=="test":
+            modes = list(self.modes) + ['seg'] # scan_types + seg
+        else:
+            modes = list(self.modes)
         for mode in modes:
             patient_id = os.path.split(patient_dir)[-1]
             volume_path = os.path.join(patient_dir, patient_id + "_" + mode + ".nii.gz")
             volume = nib.load(volume_path).get_data()
+            if self.dataset == "test":
+                volume = skTrans.resize(volume, self.crop_size, order=1, preserve_range=True)
 
             if not mode=="seg":  #apply normalization to the input images 
                 volume = self.normalize(volume)
             volumes.append(volume)
-
-        seg_volume = volumes[-1] # last element is seg mask
-        volumes = volumes[:-1]
-        volume, seg_volume = self.aug_sample(volumes, seg_volume)
-        """
-        1) "wt_volume" which is equal to 1 (True) wherever the "seg_volume" is greater than 0. 
-            This is likely selecting all voxels that correspond to necrotic (dead) tissue or unenhanced tumor regions.
-
-        2) "tc_volume" which is equal to 1 (True) wherever "seg_volume" is equal to 4 or 1. 
-            This is likely selecting all voxels that correspond to the enhancing tumor core or active tumor regions.
-
-        3) The last line creates a new variable "et_volume" which is equal to 1 (True) wherever "seg_volume" is equal to 4. 
-            This is likely selecting all voxels that correspond to the enhancing tumor core specifically.
-        """
         
-        wt_volume = seg_volume > 0 
-        tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
-        et_volume = (seg_volume == 4)
-        seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
-        seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
+        if not self.dataset=="test":
+            seg_volume = volumes[-1] # last element is seg mask
+            volumes = volumes[:-1]
+            volume, seg_volume = self.aug_sample(volumes, seg_volume)
+            """
+            1) "wt_volume" which is equal to 1 (True) wherever the "seg_volume" is greater than 0. 
+                This is likely selecting all voxels that correspond to necrotic (dead) tissue or unenhanced tumor regions.
 
-        input_data = torch.tensor(volume.copy(), dtype=torch.float)
-        mask_data = torch.tensor(seg_volume.copy(), dtype=torch.float)
+            2) "tc_volume" which is equal to 1 (True) wherever "seg_volume" is equal to 4 or 1. 
+                This is likely selecting all voxels that correspond to the enhancing tumor core or active tumor regions.
 
-        return (input_data, mask_data)
+            3) The last line creates a new variable "et_volume" which is equal to 1 (True) wherever "seg_volume" is equal to 4. 
+                This is likely selecting all voxels that correspond to the enhancing tumor core specifically.
+            """
+            
+            wt_volume = seg_volume > 0 
+            tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
+            et_volume = (seg_volume == 4)
+            seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
+            seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
+
+            input_data = torch.tensor(volume.copy(), dtype=torch.float)
+            mask_data = torch.tensor(seg_volume.copy(), dtype=torch.float)
+
+            return (input_data, mask_data)
+
+        else:
+            # resize test data
+            x = np.stack(volumes, axis=0)  
+            input_data = torch.tensor(x.copy(), dtype=torch.float)
+            return (input_data)
 
     def aug_sample(self, volumes, mask):
         """
@@ -68,7 +81,7 @@ class Brats2021(Dataset):
         x = np.stack(volumes, axis=0)       # [N, H, W, D]
         y = np.expand_dims(mask, axis=0)    # [channel, h, w, d]
 
-        if self.train:
+        if self.dataset=="train":
             # crop volume
             x, y = self.random_crop(x,y)
             if random.random() < 0.5:
@@ -80,7 +93,8 @@ class Brats2021(Dataset):
             if random.random() < 0.5:
                 x = np.flip(x, axis=3)
                 y = np.flip(y, axis=3)
-        else:
+
+        elif self.dataset=="val":
             x, y = self.center_crop(x,y)
 
         return x,y
@@ -133,8 +147,8 @@ def make_data_loaders():
     input_shape = (int(shapes[0]), int(shapes[1]), int(shapes[2]))
     data_root = params['data_root']
     train_list, val_list = split_dataset(data_root=data_root)
-    train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, train=True)
-    val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, train=False)
+    train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train")
+    val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val")
     loaders = {}
     loaders['train'] = DataLoader(train_ds, batch_size=int(params['batch_size']),
                                   num_workers=int(params['num_workers']),
