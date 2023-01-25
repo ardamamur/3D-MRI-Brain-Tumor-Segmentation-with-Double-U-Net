@@ -22,6 +22,7 @@ jupyterlab = "^3.5.1"
 lightning = "^1.9.0"
 pytorch-lightning = "^1.9.0"
 monai = "^1.1.0"
+torchio = "^0.18.86"
 
 [tool.poetry.dev-dependencies]
 
