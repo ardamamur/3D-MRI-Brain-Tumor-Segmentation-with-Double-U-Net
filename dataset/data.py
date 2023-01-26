@@ -14,11 +14,12 @@ warnings.filterwarnings('ignore')
 
 class Brats2021(Dataset):
 
-    def __init__(self, patients_dir, crop_size, modes, dataset:str=None):
+    def __init__(self, patients_dir, crop_size, modes, dataset:str=None, model_name:str=None):
         self.patients_dir = patients_dir
         self.modes = modes # scan_types
         self.dataset = dataset
         self.crop_size = crop_size
+        self.model_name = model_name
 
     def __len__(self):
         return len(self.patients_dir)
@@ -56,11 +57,14 @@ class Brats2021(Dataset):
                 This is likely selecting all voxels that correspond to the enhancing tumor core specifically.
             """
             
-            wt_volume = seg_volume > 0 
-            tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
-            et_volume = (seg_volume == 4)
-            seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
-            seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
+            if not self.model_name == "double_unet":
+                wt_volume = seg_volume > 0 
+                tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
+                et_volume = (seg_volume == 4)
+                seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
+                seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
+            else:
+                seg_volume = seg_volume.astype("float32")
 
             input_data = torch.tensor(volume.copy(), dtype=torch.float)
             mask_data = torch.tensor(seg_volume.copy(), dtype=torch.float)
@@ -139,8 +143,7 @@ def split_dataset(data_root):
     print(f"train patients: {len(train_patients_list)}, val patients: {len(val_patients_list)}")
     return train_patients_list, val_patients_list
 
-def make_data_loaders(mode:str):
-    import configparser
+def make_data_loaders(mode:str, model_name:str):
     config = configparser.ConfigParser()
     config.read('config.ini')
     params = config['params']
@@ -157,8 +160,8 @@ def make_data_loaders(mode:str):
         val_list = val_df['val'].values.tolist()
         print("train len:", len(train_list))
         # create dataset object
-        train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train")
-        val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val")
+        train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train", model_name=model_name)
+        val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val", model_name=model_name)
         # create dataloaders
         loaders = {}
         loaders['train'] = DataLoader(train_ds, batch_size=int(params['batch_size']),
@@ -174,7 +177,7 @@ def make_data_loaders(mode:str):
         test_list = glob.glob(os.path.join(data_root, "BraTS2021*"))
         n_patients = len(test_list)
         print(f"test patients: {n_patients}")
-        test_ds = Brats2021(test_list, crop_size=input_shape, modes=modes, dataset="test")
+        test_ds = Brats2021(test_list, crop_size=input_shape, modes=modes, dataset="test", model=model)
         loaders = {}
         loaders['test'] = DataLoader(test_ds, batch_size=int(params['batch_size']),
                                     num_workers=int(params['num_workers']),
@@ -209,15 +212,15 @@ def main():
     #train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, train=True)
     #val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, train=False)
     
-    #loaders = make_data_loaders(mode="train")
-    #train_loader = loaders['train']
-    #print(len(train_loader))
-    #input_image, mask_image = next(iter(train_loader))
+    loaders = make_data_loaders(mode="train", model_name="double_unet")
+    train_loader = loaders['train']
+    print(len(train_loader))
+    input_image, mask_image = next(iter(train_loader))
     #print(np.unique(mask))
-    #print(input_image.shape)
-    #print(mask_image.shape)
+    print(input_image.shape)
+    print(mask_image.shape)
     #train_list, val_list = split_dataset(cfg.DATASET.DATA_ROOT, cfg.DATASET.NUM_FOLDS, cfg.DATASET.SELECT_FOLD)
     #train_ds = Brats2018(train_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=True)
     #val_ds = Brats2018(val_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=False)
 
-#main()
+main()

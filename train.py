@@ -18,8 +18,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("device:", device)
 
 class Train():
-    def __init__(self, hyper_parameters):
-        self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
+    def __init__(self, hyper_parameters, model_name):
+        if model_name == "3dunet":
+            self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
+        else: # implememnt it later
+            # model_name == "double_unet"
+            self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
+
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
@@ -27,7 +32,7 @@ class Train():
         self.phases = ["train", "val"]
         self.num_epochs = hyper_parameters["num_epochs"]
         self.accumulation_steps = hyper_parameters['accumulation_steps']
-        self.loaders = make_data_loaders(mode="train")
+        self.loaders = make_data_loaders(mode="train", model_name=model_name)
         self.best_loss = float("inf")
         self.n_steps = hyper_parameters['n_steps']
         self.losses = {phase: [] for phase in self.phases}
@@ -92,17 +97,12 @@ class Train():
 
     def _save_train_history(self):
         """writing model weights and training logs to files."""
-        torch.save(self.model.state_dict(),
-                   f"last_epoch_model.pth")
+        torch.save(self.model.state_dict(),f"last_epoch_model.pth")
 
         logs_ = [self.losses, self.dice_scores, self.jaccard_scores]
         log_names_ = ["_loss", "_dice", "_jaccard"]
-        logs = [logs_[i][key] for i in list(range(len(logs_)))
-                         for key in logs_[i]]
-        log_names = [key+log_names_[i] 
-                     for i in list(range(len(logs_))) 
-                     for key in logs_[i]
-                    ]
+        logs = [logs_[i][key] for i in list(range(len(logs_))) for key in logs_[i]]
+        log_names = [key+log_names_[i] for i in list(range(len(logs_))) for key in logs_[i]]
         pd.DataFrame(
             dict(zip(log_names, logs))
         ).to_csv("train_log.csv", index=False)
@@ -112,7 +112,7 @@ class Train():
         print("Predtrain model loaded")
 
 
-def main():
+def main(model_name):
     config = configparser.ConfigParser()
     config.read('config.ini')
     params = config['params']
@@ -136,7 +136,7 @@ def main():
     }
     print("hyper parameters:", hyper_parameters)
     
-    trainer = Train(hyper_parameters=hyper_parameters)
+    trainer = Train(hyper_parameters=hyper_parameters, model_name=model_name)
     
     if params['pre_trained'] == "True":
         trainer.load_predtrain_model(params['pre_trained_path'])
@@ -155,4 +155,5 @@ def main():
     print("TRAINING DONE. LOGS ARE SAVED..")
 
 
-main()
+main(model_name="3dunet")
+
