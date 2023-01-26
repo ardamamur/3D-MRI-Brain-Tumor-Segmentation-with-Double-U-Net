@@ -1,11 +1,13 @@
 import os
 import glob
 import numpy as np
+import pandas as pd
 import nibabel as nib
 import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 import skimage.transform as skTrans
+import configparser
 import random
 import warnings
 warnings.filterwarnings('ignore')
@@ -148,9 +150,16 @@ def make_data_loaders(mode:str):
     loaders = {}
     if not mode == "test":
         data_root = params['train_dataset']
-        train_list, val_list = split_dataset(data_root=data_root)
+        # get patients dir from the csv files 
+        train_df = pd.read_csv("dataset/train_data.csv")
+        train_list = train_df['train'].values.tolist()
+        val_df = pd.read_csv("dataset/val_data.csv")
+        val_list = val_df['val'].values.tolist()
+        print("train len:", len(train_list))
+        # create dataset object
         train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train")
         val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val")
+        # create dataloaders
         loaders = {}
         loaders['train'] = DataLoader(train_ds, batch_size=int(params['batch_size']),
                                     num_workers=int(params['num_workers']),
@@ -174,11 +183,22 @@ def make_data_loaders(mode:str):
 
     return loaders
 
+def create_train_val_set(data_root):
+    train_list, val_list = split_dataset(data_root=data_root)
+    dict_train = {'train': train_list}
+    dict_val = {'val': val_list }
+    df_train = pd.DataFrame(dict_train) 
+    df_train.to_csv("dataset/train_data.csv")
+    df_val = pd.DataFrame(dict_val) 
+    df_val.to_csv("dataset/val_data.csv")
+    print("train and validation sets are saved in csv file format")
+
 def main():
-    import configparser
     config = configparser.ConfigParser()
     config.read('config.ini')
     params = config['params']
+    train_dataset = params['train_dataset']
+    #create_train_val_set(train_dataset)
 
     #modes = params['modes'].split(",")
     #shapes = params['input_shape'].split(",")
@@ -189,13 +209,13 @@ def main():
     #train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, train=True)
     #val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, train=False)
     
-    loaders = make_data_loaders(mode="test")
-    test_loader = loaders['test']
-    print(len(test_loader))
-    input_image = next(iter(test_loader))
+    #loaders = make_data_loaders(mode="train")
+    #train_loader = loaders['train']
+    #print(len(train_loader))
+    #input_image, mask_image = next(iter(train_loader))
     #print(np.unique(mask))
-    print(input_image.shape)
-    #print(mask.shape)
+    #print(input_image.shape)
+    #print(mask_image.shape)
     #train_list, val_list = split_dataset(cfg.DATASET.DATA_ROOT, cfg.DATASET.NUM_FOLDS, cfg.DATASET.SELECT_FOLD)
     #train_ds = Brats2018(train_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=True)
     #val_ds = Brats2018(val_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=False)
