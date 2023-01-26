@@ -62,7 +62,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, shortcut_type='B', no_cuda = False):
+    def __init__(self, block, layers,  no_cuda = False):
         self.inplanes = 64
         self.no_cuda = no_cuda
         super(ResNet, self).__init__()
@@ -71,13 +71,13 @@ class ResNet(nn.Module):
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=(3, 3, 3), stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], shortcut_type)
+        self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(
-            block, 128, layers[1], shortcut_type, stride=2)
+            block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(
-            block, 256, layers[2], shortcut_type, stride=1, dilation=2)
+            block, 256, layers[2], stride=1, dilation=2)
         self.layer4 = self._make_layer(
-            block, 512, layers[3], shortcut_type, stride=1, dilation=4)
+            block, 512, layers[3], stride=1, dilation=4)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -86,27 +86,18 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1, dilation=1):
+    def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
         if stride != 1 or self.inplanes != planes:
-            if shortcut_type == 'A':
-                downsample = partial(
-                    downsample_basic_block,
-                    planes=planes,
-                    stride=stride,
-                    no_cuda=self.no_cuda)
-            else:
-                downsample = nn.Sequential(
-                    nn.Conv3d(
-                        self.inplanes,
-                        planes,
-                        kernel_size=1,
-                        stride=stride,
-                        bias=False), nn.BatchNorm3d(planes))
+            downsample = partial(
+                downsample_basic_block,
+                planes=planes,
+                stride=stride,
+                no_cuda=self.no_cuda)
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride=stride, dilation=dilation, downsample=None))
-        self.inplanes = planes 
+        layers.append(block(self.inplanes, planes, stride=stride, dilation=dilation, downsample=downsample))
+        self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, dilation=dilation))
 
@@ -121,7 +112,6 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.conv_seg(x)
 
         return x
 
@@ -134,10 +124,12 @@ def resnet18():
     return model
 
 def prepare_state_dict(path):
-    state_dict = torch.load(path, map_location=torch.device('cpu'))
+    if torch.cuda.is_available():
+        state_dict = torch.load('../pretrained/resnet_18.pth')
+    else:
+        state_dict = torch.load('../pretrained/resnet_18.pth',map_location=torch.device('cpu'))
     state_dict = state_dict['state_dict']
     new_state_dict = {}
-
     for key in state_dict.keys():
         keys = key.split(".")
         new_key = keys[1]
@@ -145,3 +137,4 @@ def prepare_state_dict(path):
             new_key += '.'+keys[i]
         new_state_dict[new_key] = state_dict[key]
     return new_state_dict
+
