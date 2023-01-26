@@ -75,7 +75,7 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(
             block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(
-            block, 256, layers[2], stride=1, dilation=2)
+            block, 256, layers[2], stride=2, dilation=2)
         self.layer4 = self._make_layer(
             block, 512, layers[3], stride=1, dilation=4)
 
@@ -104,23 +104,33 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        skip_layers = []
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+        skip_layers.append(x)
         x = self.maxpool(x)
         x = self.layer1(x)
+        skip_layers.append(x)
         x = self.layer2(x)
+        skip_layers.append(x)
         x = self.layer3(x)
         x = self.layer4(x)
 
-        return x
+        return x, skip_layers
 
-def resnet18():
+def pre_trained_resnet18():
     """Constructs a ResNet-18 model.
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2])
     state_dict = prepare_state_dict('../pretrained/resnet_18.pth')
     model.load_state_dict(state_dict)
+    return model
+
+def resnet18():
+    """Constructs a ResNet-18 model.
+    """
+    model = ResNet(BasicBlock, [2, 2, 2, 2])
     return model
 
 def prepare_state_dict(path):
