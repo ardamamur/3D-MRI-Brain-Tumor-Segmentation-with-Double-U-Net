@@ -105,6 +105,7 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         skip_layers = []
+        skip_layers.append(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
