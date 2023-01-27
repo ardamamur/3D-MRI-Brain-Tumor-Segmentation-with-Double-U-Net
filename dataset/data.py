@@ -158,7 +158,7 @@ def make_data_loaders(mode:str, model_name:str):
         train_list = train_df['train'].values.tolist()
         val_df = pd.read_csv("dataset/val_data.csv")
         val_list = val_df['val'].values.tolist()
-        print("train len:", len(train_list))
+        #print("train len:", len(train_list))
         # create dataset object
         train_ds = Brats2021(train_list, crop_size=input_shape, modes=modes, dataset="train", model_name=model_name)
         val_ds = Brats2021(val_list, crop_size=input_shape, modes=modes, dataset="val", model_name=model_name)
@@ -223,4 +223,4 @@ def main():
     #train_ds = Brats2018(train_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=True)
     #val_ds = Brats2018(val_list, crop_size=cfg.DATASET.INPUT_SHAPE, modes=cfg.DATASET.USE_MODES, train=False)
 
-main()
+#main()
