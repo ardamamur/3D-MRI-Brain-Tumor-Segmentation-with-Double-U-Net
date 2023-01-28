@@ -31,8 +31,12 @@ class Train():
         self.best_loss = float("inf")
         self.n_steps = hyper_parameters['n_steps']
         self.losses = {phase: [] for phase in self.phases}
-        self.dice_scores = {phase: [] for phase in self.phases}
-        self.jaccard_scores = {phase: [] for phase in self.phases}
+        self.dice_scores_WT = {phase: [] for phase in self.phases}
+        self.dice_scores_TC = {phase: [] for phase in self.phases}
+        self.dice_scores_ET = {phase: [] for phase in self.phases}
+        self.jaccard_scores_WT = {phase: [] for phase in self.phases}
+        self.jaccard_scores_TC = {phase: [] for phase in self.phases}
+        self.jaccard_scores_ET = {phase: [] for phase in self.phases}
 
     def _compute_loss_and_outputs(self, images: torch.Tensor, targets: torch.Tensor):
         images = images.to(device)
@@ -66,11 +70,28 @@ class Train():
                 print("BCEDice loss: ", loss.item())
         
         epoch_loss = (running_loss * self.accumulation_steps) / total_batches
-        epoch_dice, epoch_iou = meter.get_metrics()
-        print("Epoch loss: ", epoch_loss, ", Dice loss: ", epoch_dice, ", IoU loss: " , epoch_iou )
+        metrics = meter.get_metrics()
+        print("###################################")
+        print("accumulated loss: ", epoch_loss)
+
+        print("WT dice: " , metrics['dice_WT'], 
+            " TC dice: " , metrics['dice_TC'] ,
+            " ET dice: ", metrics['dice_ET'])
+
+        print("WT jaccard: ", metrics['iou_WT'],
+            " TC jaccard: ", metrics['iou_TC'],
+            " ET jaccard: ", metrics['iou_ET'])
+
+        print("###################################")
+        
         self.losses[phase].append(epoch_loss)
-        self.dice_scores[phase].append(epoch_dice)
-        self.jaccard_scores[phase].append(epoch_iou)
+        self.dice_scores_WT[phase].append(metrics['dice_WT'])
+        self.dice_scores_TC[phase].append(metrics['dice_TC'])
+        self.dice_scores_ET[phase].append(metrics['dice_ET'])
+
+        self.jaccard_scores_WT[phase].append(metrics['iou_WT'])
+        self.jaccard_scores_TC[phase].append(metrics['iou_TC'])
+        self.jaccard_scores_ET[phase].append(metrics['iou_ET'])
         
         return epoch_loss
 
@@ -83,9 +104,8 @@ class Train():
                 self.scheduler.step(val_loss)
             if self.display_plot:
                 self._plot_train_history()
-                
             if val_loss < self.best_loss:
-                print(f"\n{'#'*20}\nSaved new checkpoint\n{'#'*20}\n")
+                print("Saved new checkpoint")
                 self.best_loss = val_loss
                 torch.save(self.model.state_dict(), "best_model.pth")
             print()
@@ -95,15 +115,20 @@ class Train():
     def _save_train_history(self):
         """writing model weights and training logs to files."""
         torch.save(self.model.state_dict(),
-                   f"last_epoch_model.pth")
+                f"last_epoch_model.pth")
 
-        logs_ = [self.losses, self.dice_scores, self.jaccard_scores]
-        log_names_ = ["_loss", "_dice", "_jaccard"]
+        logs_ = [self.losses,
+                self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET,
+                self.jaccard_scores_WT, self.jaccard_scores_TC, self.jaccard_scores_ET]
+
+        log_names_ = ["_loss", "_dice_WT", "_dice_TC", "dice_ET",
+                    "_jaccard_WT", "_jaccard_TC", "_jaccard_ET"]
+
         logs = [logs_[i][key] for i in list(range(len(logs_)))
-                         for key in logs_[i]]
+                        for key in logs_[i]]
         log_names = [key+log_names_[i] 
-                     for i in list(range(len(logs_))) 
-                     for key in logs_[i]
+                    for i in list(range(len(logs_))) 
+                    for key in logs_[i]
                     ]
         pd.DataFrame(
             dict(zip(log_names, logs))
@@ -147,12 +172,26 @@ def main():
         train_logs = pd.read_csv("train_log.csv")
         trainer.losses["train"] =  train_logs.loc[:, "train_loss"].to_list()
         trainer.losses["val"] =  train_logs.loc[:, "val_loss"].to_list()
-        trainer.dice_scores["train"] = train_logs.loc[:, "train_dice"].to_list()
-        trainer.dice_scores["val"] = train_logs.loc[:, "val_dice"].to_list()
-        trainer.jaccard_scores["train"] = train_logs.loc[:, "train_jaccard"].to_list()
-        trainer.jaccard_scores["val"] = train_logs.loc[:, "val_jaccard"].to_list()
 
-    print("START TRAINING")
+
+        trainer.dice_scores_WT["train"] = train_logs.loc[:, "train_dice_WT"].to_list()
+        trainer.dice_scores_TC["train"] = train_logs.loc[:, "train_dice_TC"].to_list()
+        trainer.dice_scores_ET["train"] = train_logs.loc[:, "train_dice_ET"].to_list()
+
+        trainer.dice_scores_WT["val"] = train_logs.loc[:, "val_dice_WT"].to_list()
+        trainer.dice_scores_TC["val"] = train_logs.loc[:, "val_dice_TC"].to_list()
+        trainer.dice_scores_ET["val"] = train_logs.loc[:, "val_dice_ET"].to_list()
+
+
+        trainer.jaccard_scores_WT["train"] = train_logs.loc[:, "train_jaccard_WT"].to_list()
+        trainer.jaccard_scores_TC["train"] = train_logs.loc[:, "train_jaccard_TC"].to_list()
+        trainer.jaccard_scores_ET["train"] = train_logs.loc[:, "train_jaccard_ET"].to_list()
+
+        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
+        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
+        trainer.jaccard_scores_ET["val"] = train_logs.loc[:, "val_jaccard"].to_list()
+
+    print("START TRAINING")         
     trainer.run()
     print("TRAINING DONE. LOGS ARE SAVED..")
 
