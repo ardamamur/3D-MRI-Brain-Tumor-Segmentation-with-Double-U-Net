@@ -22,9 +22,9 @@ class Train():
         if model_name == "3dunet":
             self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
         else: # implememnt it later
-            # model_name == "double_unet"
-            self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
-
+            #model_name == "double_unet"
+            self.model =  DoubleUNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3)
+        self.model_name = model_name
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
@@ -42,8 +42,17 @@ class Train():
     def _compute_loss_and_outputs(self, images: torch.Tensor, targets: torch.Tensor):
         images = images.to(device)
         targets = targets.to(device)
-        logits = self.model(images)
-        loss = self.criterion(logits, targets)
+        logits = None
+        loss = None
+        if self.model_name == "3dunet":
+            logits = self.model(images)
+            loss = self.criterion(logits, targets)
+        else:
+            logit1, logit2 = self.model(images)
+            loss1 = self.criterion(logit1, targets[:,0].unsqueeze(1))
+            loss2 = self.criterion(logit2, targets)
+            loss = loss1+ loss2
+            logits = logit2
         return loss, logits
 
     def _do_epoch(self, epoch:int, phase:str):
@@ -82,6 +91,8 @@ class Train():
 
     def run(self):
         for epoch in range(self.num_epochs):
+            if self.model_name != "3dunet":
+                self.model.enc1.requires_grad_(False)
             self._do_epoch(epoch, "train")
             with torch.no_grad():
                 val_loss = self._do_epoch(epoch, "val")

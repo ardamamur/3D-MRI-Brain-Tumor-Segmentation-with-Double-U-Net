@@ -57,14 +57,11 @@ class Brats2021(Dataset):
                 This is likely selecting all voxels that correspond to the enhancing tumor core specifically.
             """
             
-            if not self.model_name == "double_unet":
-                wt_volume = seg_volume > 0 
-                tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
-                et_volume = (seg_volume == 4)
-                seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
-                seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
-            else:
-                seg_volume = seg_volume.astype("float32")
+            wt_volume = seg_volume > 0 
+            tc_volume = np.logical_or(seg_volume == 4, seg_volume == 1)
+            et_volume = (seg_volume == 4)
+            seg_volume = [wt_volume, tc_volume, et_volume] # seg.shape = [3 h w d]
+            seg_volume = np.concatenate(seg_volume, axis=0).astype("float32")
 
             input_data = torch.tensor(volume.copy(), dtype=torch.float)
             mask_data = torch.tensor(seg_volume.copy(), dtype=torch.float)
