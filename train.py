@@ -26,7 +26,6 @@ class Train():
             self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
         else:
             self.model =  DoubleUNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3)
-        self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
@@ -185,7 +184,7 @@ def main():
         trainer.load_predtrain_model(params['pre_trained_path'])
         
         # if need - load the logs.      
-        train_logs = pd.read_csv("train_log.csv")
+        train_logs = pd.read_csv("trained_models/3D-Double-UNet/train_log.csv")
         trainer.losses["train"] =  train_logs.loc[:, "train_loss"].to_list()
         trainer.losses["val"] =  train_logs.loc[:, "val_loss"].to_list()
 
