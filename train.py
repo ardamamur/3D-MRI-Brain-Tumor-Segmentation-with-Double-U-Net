@@ -173,7 +173,7 @@ def main():
         "shapes" : shapes,
         "num_epochs" : int(params['num_epochs']),
         "input_shape" : (int(shapes[0]), int(shapes[1]), int(shapes[2])),
-        "accumulation_steps" : 4 / int(params['batch_size']),
+        "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
         "n_steps" : 5
     
     }
