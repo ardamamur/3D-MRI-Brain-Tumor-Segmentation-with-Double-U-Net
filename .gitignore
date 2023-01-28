@@ -1,0 +1,6 @@
+trial.ipynb
+/.ipynb_checkpoints
+models/.ipynb_checkpoints
+*.pyc
+__pycache__
+models/__pycache__
