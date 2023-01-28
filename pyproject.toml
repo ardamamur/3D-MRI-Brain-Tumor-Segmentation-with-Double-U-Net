@@ -23,6 +23,7 @@ lightning = "^1.9.0"
 pytorch-lightning = "^1.9.0"
 monai = "^1.1.0"
 torchio = "^0.18.86"
+tensorboard = "^2.11.2"
 
 [tool.poetry.dev-dependencies]
 
