@@ -123,7 +123,7 @@ class Train():
             if val_loss < self.best_loss:
                 print("Saved new checkpoint")
                 self.best_loss = val_loss
-                torch.save(self.model.state_dict(), "best_model.pth")
+                torch.save(self.model.state_dict(), "trained_models/3D-Double-UNet/best_model.pth")
             print()
         self._save_train_history()       
 
@@ -131,7 +131,7 @@ class Train():
     def _save_train_history(self):
         """writing model weights and training logs to files."""
         torch.save(self.model.state_dict(),
-                f"last_epoch_model.pth")
+                f"trained_models/3D-Double-UNet/last_epoch_model.pth")
 
         logs_ = [self.losses,
                 self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET,
@@ -148,7 +148,7 @@ class Train():
                     ]
         pd.DataFrame(
             dict(zip(log_names, logs))
-        ).to_csv("train_log.csv", index=False)
+        ).to_csv("trained_models/3D-Double-UNet/train_log.csv", index=False)
 
     def load_predtrain_model(self, state_path: str):
         self.model.load_state_dict(torch.load(state_path))
