@@ -84,14 +84,14 @@ class Encoder2(nn.Module):
 
 
 class Decoder2(nn.Module):
-    def __init__(self,in_channels = 4) :
+    def __init__(self,in_channels = 4, n_classes = 3) :
         super().__init__()
         self.in_channels = in_channels
         self.dec1 = Up(512+ 256+ self.in_channels*128, 256)
         self.dec2 = Up(256+ 128+ self.in_channels*64, 128)
         self.dec3 = Up(128+ 64+ self.in_channels*64, 64)
         self.dec4 = Up(80+ self.in_channels, 32)
-        self.out = un.Out(32, 16)
+        self.out = un.Out(32, n_classes)
 
     def forward(self, x, skip_layers1, skip_layers2):
         x1 = self.dec1(x,skip_layers1[3],skip_layers2[3])
@@ -109,7 +109,7 @@ class DoubleUNet3d(nn.Module):
         self.dec1 = Decoder1(in_channels)
         self.enc2 = Encoder2(in_channels)
         self.dec2 = Decoder2(in_channels)
-        self.conv = nn.Conv3d(16, n_classes, kernel_size = 1)
+        self.conv = nn.Conv3d(n_classes+1, n_classes, kernel_size = 1)
     def forward(self, x):
         x1_ls = []
         skip_layers1_ls = []
@@ -128,7 +128,7 @@ class DoubleUNet3d(nn.Module):
         x3 = torch.mul(out1, x)
         x4, skip_layers2 = self.enc2(x3)
         out2 = self.dec2(x4,skip_layers1,skip_layers2)
-        out = torch.mul(out2, out1)
+        out = torch.cat([out2, out1],dim=1)
         mask = self.conv(out)
         
         return out1, mask
