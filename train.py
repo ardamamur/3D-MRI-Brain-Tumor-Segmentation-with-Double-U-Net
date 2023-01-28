@@ -170,7 +170,6 @@ def main():
         "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
         "n_steps" : 5,
         "checkpoint_path" : params['checkpoint_path'],
-        "load_model_path" : params['load_model_path'],
         "model_name" : params["model_name"]
     
     }
@@ -179,10 +178,11 @@ def main():
     trainer = Train(hyper_parameters=hyper_parameters, model_name=hyper_parameters['model_name'])
     
     if params['pre_trained'] == "True":
-        trainer.load_predtrain_model(params['pre_trained_path'])
+        model_path = params['pre_trained_path'] + params['pre_trained_model']
+        trainer.load_predtrain_model(model_path)
         
         # if need - load the logs.
-        log_path = hyper_parameters['load_model_path'] + 'train_log.csv'
+        log_path = params['pre_trained_path'] + 'train_log.csv'
         train_logs = pd.read_csv(log_path)
         trainer.losses["train"] =  train_logs.loc[:, "train_loss"].to_list()
         trainer.losses["val"] =  train_logs.loc[:, "val_loss"].to_list()
