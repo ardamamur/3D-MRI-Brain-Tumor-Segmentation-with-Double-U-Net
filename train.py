@@ -30,7 +30,7 @@ class Train():
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
-        self.criterion = BCEDiceLoss()
+        self.criterion = DiceLossV2()
         self.phases = ["train", "val"]
         self.num_epochs = hyper_parameters["num_epochs"]
         self.accumulation_steps = hyper_parameters['accumulation_steps']
