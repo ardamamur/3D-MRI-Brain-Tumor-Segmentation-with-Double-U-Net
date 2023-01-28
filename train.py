@@ -93,10 +93,6 @@ class Train():
             " TC dice: " , metrics['dice_TC'] ,
             " ET dice: ", metrics['dice_ET'])
 
-        print("WT jaccard: ", metrics['iou_WT'],
-            " TC jaccard: ", metrics['iou_TC'],
-            " ET jaccard: ", metrics['iou_ET'])
-
         print("###################################")
         
         self.losses[phase].append(epoch_loss)
@@ -104,9 +100,9 @@ class Train():
         self.dice_scores_TC[phase].append(metrics['dice_TC'])
         self.dice_scores_ET[phase].append(metrics['dice_ET'])
 
-        self.jaccard_scores_WT[phase].append(metrics['iou_WT'])
-        self.jaccard_scores_TC[phase].append(metrics['iou_TC'])
-        self.jaccard_scores_ET[phase].append(metrics['iou_ET'])
+        #self.jaccard_scores_WT[phase].append(metrics['iou_WT'])
+        #self.jaccard_scores_TC[phase].append(metrics['iou_TC'])
+        #self.jaccard_scores_ET[phase].append(metrics['iou_ET'])
         
         return epoch_loss
 
@@ -133,11 +129,9 @@ class Train():
                 f"trained_models/3D-Double-UNet/last_epoch_model.pth")
 
         logs_ = [self.losses,
-                self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET,
-                self.jaccard_scores_WT, self.jaccard_scores_TC, self.jaccard_scores_ET]
+                self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET]
 
-        log_names_ = ["_loss", "_dice_WT", "_dice_TC", "dice_ET",
-                    "_jaccard_WT", "_jaccard_TC", "_jaccard_ET"]
+        log_names_ = ["_loss", "_dice_WT", "_dice_TC", "dice_ET"]
 
         logs = [logs_[i][key] for i in list(range(len(logs_)))
                         for key in logs_[i]]
@@ -196,15 +190,6 @@ def main():
         trainer.dice_scores_WT["val"] = train_logs.loc[:, "val_dice_WT"].to_list()
         trainer.dice_scores_TC["val"] = train_logs.loc[:, "val_dice_TC"].to_list()
         trainer.dice_scores_ET["val"] = train_logs.loc[:, "val_dice_ET"].to_list()
-
-
-        trainer.jaccard_scores_WT["train"] = train_logs.loc[:, "train_jaccard_WT"].to_list()
-        trainer.jaccard_scores_TC["train"] = train_logs.loc[:, "train_jaccard_TC"].to_list()
-        trainer.jaccard_scores_ET["train"] = train_logs.loc[:, "train_jaccard_ET"].to_list()
-
-        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
-        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
-        trainer.jaccard_scores_ET["val"] = train_logs.loc[:, "val_jaccard"].to_list()
 
     print("START TRAINING")         
     trainer.run()
