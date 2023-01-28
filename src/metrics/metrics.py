@@ -15,11 +15,27 @@ def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, threshold=0
     if mode == "overall":
         intersection = pred*truth
         union = pred + truth
-        dice_score = 2*intersection.sum(0, -1) / union.sum(0, -1)
+
+        union_sum = union.sum(0, -1)
+
+        union_zero = (union_sum == 0)
+
+        dice_score = torch.zeros(union_sum.shape, device="cuda")
+
+        dice_score[union_zero] = 1
+        dice_score[~union_zero] = 2*intersection.sum(0, -1) / union_sum
 
     if mode == "average":
         intersection = pred*truth
         union = pred + truth
-        dice_score = 2*intersection.sum(-1) / union.sum(-1)
+
+        union_sum = union.sum(-1)
+
+        union_zero = (union_sum == 0)
+
+        dice_score = torch.zeros(union_sum.shape, device="cuda")
+        
+        dice_score[union_zero] == 1
+        dice_score[~union_zero] = 2*intersection.sum(-1) / union_sum
         dice_score = dice_score.mean(0)
     return dice_score

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class DiceLoss(nn.Module):
-    def __init__(self, sigmoid=True, mode="sum", eps=1e-7) -> None:
+    def __init__(self, sigmoid=True, mode="average_channel_batch", eps=1e-7) -> None:
         super().__init__()
         self.sigmoid = sigmoid
         self.mode = mode
