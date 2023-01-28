@@ -1,8 +1,10 @@
 import configparser
 from models.UNet3D_v1 import UNet3d
+from models.double_u_net import *
 from solver import PolyLR
 from dataset.data import *
 #from models.UNet3D_V2 import *
+
 #from models.double_u_net import *
 #from models.VAE_net import * 
 from models.loss import *
