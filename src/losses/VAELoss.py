@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from KLDivergenceIndGaussian import KLDivergence
-from DiceLoss import DiceLoss
+from src.losses.KLDivergenceIndGaussian import KLDivergence
+from src.losses.DiceLoss import DiceLoss
 
 class VAELoss(nn.Module):
     def __init__(self, w_KL=0.1, w_reconstruct=0.1) -> None:
