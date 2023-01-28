@@ -43,6 +43,7 @@ class Train():
         self.jaccard_scores_WT = {phase: [] for phase in self.phases}
         self.jaccard_scores_TC = {phase: [] for phase in self.phases}
         self.jaccard_scores_ET = {phase: [] for phase in self.phases}
+        self.checkpoint_path = hyper_parameters['checkpoint_path']
 
     def _compute_loss_and_outputs(self, images: torch.Tensor, targets: torch.Tensor):
         images = images.to(device)
@@ -116,15 +117,16 @@ class Train():
             if val_loss < self.best_loss:
                 print("Saved new checkpoint")
                 self.best_loss = val_loss
-                torch.save(self.model.state_dict(), "trained_models/3D-Double-UNet/best_model.pth")
+                model_path = self.checkpoint_path + "best_model.pth"
+                torch.save(self.model.state_dict(), model_path)
             print()
         self._save_train_history()       
 
 
     def _save_train_history(self):
         """writing model weights and training logs to files."""
-        torch.save(self.model.state_dict(),
-                f"trained_models/3D-Double-UNet/last_epoch_model.pth")
+        last_model_path = self.checkpoint_path + "last_epoch_model.pth"
+        torch.save(self.model.state_dict(),last_model_path)
 
         logs_ = [self.losses,
                 self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET]
@@ -137,9 +139,10 @@ class Train():
                     for i in list(range(len(logs_))) 
                     for key in logs_[i]
                     ]
+        log_path = self.checkpoint_path + "train_log.csv"
         pd.DataFrame(
             dict(zip(log_names, logs))
-        ).to_csv("trained_models/3D-Double-UNet/train_log.csv", index=False)
+        ).to_csv(log_path, index=False)
 
     def load_predtrain_model(self, state_path: str):
         self.model.load_state_dict(torch.load(state_path))
@@ -165,18 +168,22 @@ def main():
         "num_epochs" : int(params['num_epochs']),
         "input_shape" : (int(shapes[0]), int(shapes[1]), int(shapes[2])),
         "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
-        "n_steps" : 5
+        "n_steps" : 5,
+        "checkpoint_path" : params['checkpoint_path'],
+        "load_model_path" : params['load_model_path'],
+        "model_name" : params["model_name"]
     
     }
     print("hyper parameters:", hyper_parameters)
     
-    trainer = Train(hyper_parameters=hyper_parameters, model_name="double_unet")
+    trainer = Train(hyper_parameters=hyper_parameters, model_name=hyper_parameters['model_name'])
     
     if params['pre_trained'] == "True":
         trainer.load_predtrain_model(params['pre_trained_path'])
         
-        # if need - load the logs.      
-        train_logs = pd.read_csv("trained_models/3D-Double-UNet/train_log.csv")
+        # if need - load the logs.
+        log_path = hyper_parameters['load_model_path'] + 'train_log.csv'
+        train_logs = pd.read_csv(log_path)
         trainer.losses["train"] =  train_logs.loc[:, "train_loss"].to_list()
         trainer.losses["val"] =  train_logs.loc[:, "val_loss"].to_list()
 
