@@ -1,3 +1,8 @@
+.ipynb_checkpoints/
+*.pyc
+.idea/
+__pycache__/
+runs/
 trial.ipynb
 /.ipynb_checkpoints
 models/.ipynb_checkpoints
