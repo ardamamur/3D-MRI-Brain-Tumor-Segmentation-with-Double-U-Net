@@ -5,6 +5,50 @@ import torch.nn.functional as F
 import warnings
 warnings.simplefilter("ignore")
 
+import torch.nn as nn
+import torch.nn.functional as F
+import torch
+
+def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, threshold=0.5, mode="average"):
+    
+    assert len(pred.shape) == 5
+    
+    pred[pred>=threshold] = 1
+
+    pred = pred.flatten(-3)
+    truth = truth.flatten(-3)
+
+    dice_score = None
+    if mode == "overall":
+        intersection = pred*truth
+        union = pred + truth
+
+        union_sum = union.sum(0, -1)
+
+        union_zero = (union_sum == 0)
+
+        dice_score = torch.zeros(union_sum.shape, device="cuda")
+
+        dice_score[union_zero] = 1
+        dice_score[~union_zero] = 2*intersection.sum(0, -1) / union_sum
+
+    if mode == "average":
+        intersection = pred*truth
+        union = pred + truth
+
+        union_sum = union.sum(-1)
+
+        union_zero = (union_sum == 0)
+
+        dice_score = torch.zeros(union_sum.shape, device="cuda")
+        
+        dice_score[union_zero] == 1
+        dice_score[~union_zero] = 2*intersection.sum(-1) / union_sum
+        dice_score = dice_score.mean(0)
+    return dice_score
+
+
+
 def dice_coef_metric(probabilities: torch.Tensor,
                     truth: torch.Tensor,
                     treshold: float = 0.5,
@@ -72,9 +116,9 @@ class Meter:
         self.dice_WT: list  = []
         self.dice_TC: list = []
         self.dice_ET: list = []
-        self.iou_WT: list = []
-        self.iou_TC: list = []
-        self.iou_ET: list = []
+        #self.iou_WT: list = []
+        #self.iou_TC: list = []
+        #self.iou_ET: list = []
         #self.iou_scores: list = []
     
     def update(self, logits: torch.Tensor, targets: torch.Tensor):
@@ -83,16 +127,19 @@ class Meter:
         calculates dice and iou scores, and stores them in lists.
         """
         probs = torch.sigmoid(logits)
+        
+        dice_scores = channel_wise_dice_score(probs, targets)
+
         dice = dice_coef_metric(probs, targets, self.threshold)
-        iou = jaccard_coef_metric(probs, targets, self.threshold)
+        #iou = jaccard_coef_metric(probs, targets, self.threshold)
         
         self.dice_WT.append(dice[0])
         self.dice_TC.append(dice[1])
         self.dice_ET.append(dice[2])
 
-        self.iou_WT.append(iou[0])
-        self.iou_TC.append(iou[1])
-        self.iou_ET.append(iou[2])
+        #self.iou_WT.append(iou[0])
+        #self.iou_TC.append(iou[1])
+        #self.iou_ET.append(iou[2])
 
         #self.dice_scores.append(dice)
         #self.iou_scores.append(iou)
@@ -105,17 +152,17 @@ class Meter:
         dice_score_TC = np.mean(self.dice_TC)
         dice_score_ET = np.mean(self.dice_ET)
 
-        iou_score_WT = np.mean(self.iou_WT)
-        iou_score_TC = np.mean(self.iou_TC)
-        iou_score_ET = np.mean(self.dice_ET)
+        #iou_score_WT = np.mean(self.iou_WT)
+        #iou_score_TC = np.mean(self.iou_TC)
+        #iou_score_ET = np.mean(self.dice_ET)
 
         metrics = {
             "dice_WT" : dice_score_WT,
             "dice_TC" : dice_score_TC,
             "dice_ET" : dice_score_ET,
-            "iou_WT"  : iou_score_WT,
-            "iou_TC" : iou_score_TC,
-            "iou_ET" : iou_score_ET
+            #"iou_WT"  : iou_score_WT,
+            #"iou_TC" : iou_score_TC,
+            #"iou_ET" : iou_score_ET
         }
 
         return metrics
