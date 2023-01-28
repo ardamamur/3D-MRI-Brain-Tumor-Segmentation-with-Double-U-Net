@@ -27,7 +27,7 @@ def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, threshold=0
 
         union_zero = (union_sum == 0)
 
-        dice_score = torch.zeros(union_sum.shape, device="cuda")
+        dice_score = torch.zeros(union_sum.shape)
 
         dice_score[union_zero] = 1
         dice_score[~union_zero] = 2*intersection.sum(0, -1) / union_sum
@@ -40,7 +40,7 @@ def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, threshold=0
 
         union_zero = (union_sum == 0)
 
-        dice_score = torch.zeros(union_sum.shape, device="cuda")
+        dice_score = torch.zeros(union_sum.shape)
         
         dice_score[union_zero] == 1
         dice_score[~union_zero] = 2*intersection.sum(-1) / union_sum
@@ -128,9 +128,9 @@ class Meter:
         """
         probs = torch.sigmoid(logits)
         
-        dice_scores = channel_wise_dice_score(probs, targets)
+        dice = channel_wise_dice_score(probs, targets)
 
-        dice = dice_coef_metric(probs, targets, self.threshold)
+        #dice = dice_coef_metric(probs, targets, self.threshold)
         #iou = jaccard_coef_metric(probs, targets, self.threshold)
         
         self.dice_WT.append(dice[0])

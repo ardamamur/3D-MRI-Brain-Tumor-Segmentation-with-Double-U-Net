@@ -82,7 +82,7 @@ class Train():
             running_loss += loss.item()
             meter.update(logits.detach().cpu(),targets.detach().cpu())
             if (itr + 1) % self.n_steps == 0:
-                print("BCEDice loss: ", loss.item())
+                print("Dice loss: ", loss.item())
         
         epoch_loss = (running_loss * self.accumulation_steps) / total_batches
         metrics = meter.get_metrics()
