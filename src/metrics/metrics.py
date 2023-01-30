@@ -2,11 +2,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, threshold=0.5, mode="average"):
+def channel_wise_dice_score(pred: torch.Tensor, truth: torch.Tensor, mode="average"):
     
     assert len(pred.shape) == 5
-    
-    pred[pred>=threshold] = 1
 
     pred = pred.flatten(-3)
     truth = truth.flatten(-3)
