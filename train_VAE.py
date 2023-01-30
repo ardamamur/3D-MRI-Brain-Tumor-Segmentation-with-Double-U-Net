@@ -15,8 +15,12 @@ def main():
     train_path = "/cluster/51/emre/project/data/RSNA_ASNR_MICCAI_BraTS2021_TrainingData_16July2021"
     data = BraTSDataset(train_path, training=True)
     
-    torch.manual_seed(0)
-    train, val = random_split(data, [0.9, 0.1])
+    gen = torch.Generator()
+    gen.manual_seed(0)
+    train, val = torch.utils.data.random_split(
+        data, [0.9, 0.1],
+        generator=gen
+    )
 
     train_loader = DataLoader(train, batch_size=1, num_workers=16)
     val_loader = DataLoader(val, batch_size=1, num_workers=16)
@@ -25,7 +29,8 @@ def main():
     logger = TensorBoardLogger(experiment+"/logs/")
     model = VAELightning(data.crop_size)
 
-    checkpoint_best = ModelCheckpoint(dirpath=experiment+"/best_models/",
+    checkpoint_best = ModelCheckpoint(
+        dirpath=experiment+"/best_models/",
         filename='{name}_{epoch}_{val_avg_overall_dice:.2f}',
         save_top_k=5,
         monitor='val_avg_overall_dice',
@@ -46,7 +51,7 @@ def main():
     
     model = model.cuda()
     # start training
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader, val_loader, ckpt_path="/cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/runs/VAE/Dice_AVG_Second/last_models/last.ckpt")
 
 if __name__ == "__main__":
     main()
