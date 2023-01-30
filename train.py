@@ -181,7 +181,7 @@ def main():
         model_path = params['pre_trained_path'] + params['pre_trained_model']
         trainer.load_predtrain_model(model_path)
         
-        """
+        
         # if need - load the logs.
         log_path = params['pre_trained_path'] + 'train_log.csv'
         train_logs = pd.read_csv(log_path)
@@ -191,12 +191,11 @@ def main():
 
         trainer.dice_scores_WT["train"] = train_logs.loc[:, "train_dice_WT"].to_list()
         trainer.dice_scores_TC["train"] = train_logs.loc[:, "train_dice_TC"].to_list()
-        trainer.dice_scores_ET["train"] = train_logs.loc[:, "train_dice_ET"].to_list()
+        trainer.dice_scores_ET["train"] = train_logs.loc[:, "traindice_ET"].to_list()
 
         trainer.dice_scores_WT["val"] = train_logs.loc[:, "val_dice_WT"].to_list()
         trainer.dice_scores_TC["val"] = train_logs.loc[:, "val_dice_TC"].to_list()
-        trainer.dice_scores_ET["val"] = train_logs.loc[:, "val_dice_ET"].to_list()
-        """
+        trainer.dice_scores_ET["val"] = train_logs.loc[:, "valdice_ET"].to_list()
 
     print("START TRAINING")         
     trainer.run()
