@@ -27,7 +27,9 @@ class VAELightning(pl.LightningModule):
     def forward(self, x):
         enc, x1, x2, x3 = self.encoder(x)
         pred = self.decoder(enc, x1, x2, x3)
-        return torch.sigmoid(pred)
+        pred = torch.sigmoid(pred)
+        pred = (pred > 0.5).float()
+        return pred
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=1e-4, weight_decay=1e-5)
@@ -89,3 +91,16 @@ class VAELightning(pl.LightningModule):
 
         self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
         self.log("val_avg_overall_dice", avg_dice_coeff.mean())
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        pred = self.forward(x)
+        num_classes = len(self.channel_to_class)
+        dice_coeff = channel_wise_dice_score(pred, y)
+
+        # average over batch
+        hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
+        
+        dice = {"val_dice_coeff": {self.channel_to_class[i]: dice[i] for i in range(num_classes)}}
+        hausdorff = {"val_hausdorff": {self.channel_to_class[i]: hausdorff[i] for i in range(num_classes)}}
+        return {"dice_coeff": dice.cpu(), "hausdorff": hausdorff.cpu()}
