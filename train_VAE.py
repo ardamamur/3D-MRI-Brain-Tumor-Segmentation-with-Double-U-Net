@@ -22,8 +22,8 @@ def main():
         generator=gen
     )
 
-    train_loader = DataLoader(train, batch_size=1, num_workers=16)
-    val_loader = DataLoader(val, batch_size=1, num_workers=16)
+    train_loader = DataLoader(train, batch_size=1, num_workers=16, pin_memory=True)
+    val_loader = DataLoader(val, batch_size=1, num_workers=16, pin_memory=True)
     name = "Dice_AVG_Second"
     experiment = base+name
     logger = TensorBoardLogger(experiment+"/logs/")
