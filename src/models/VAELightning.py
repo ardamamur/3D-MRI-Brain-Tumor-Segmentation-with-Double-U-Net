@@ -12,6 +12,9 @@ from solver import PolyLR
 from metrics.metrics import channel_wise_dice_score
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
+from torchmetrics import Dice#
+from monai.metrics.meandice import compute_dice
+
 class VAELightning(pl.LightningModule):
     def __init__(self, volume_shape, modalities=4, start_channels=32, num_classes=3) -> None:
         super().__init__()
@@ -23,6 +26,8 @@ class VAELightning(pl.LightningModule):
         self.dice_loss = DiceLoss()
 
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
+
+        # self.dice_metric = Dice(zero_division=1, num_classes=3, threshold=0.5, average="samples", mdmc_average="global")
 
     def forward(self, x):
         enc, x1, x2, x3 = self.encoder(x)
@@ -96,11 +101,11 @@ class VAELightning(pl.LightningModule):
         x, y = batch
         pred = self.forward(x)
         num_classes = len(self.channel_to_class)
-        dice_coeff = channel_wise_dice_score(pred, y)
+        dice_coeff = self.dice_metric(pred, y)
 
         # average over batch
         hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
         
-        dice = {"val_dice_coeff": {self.channel_to_class[i]: dice[i] for i in range(num_classes)}}
+        dice = {"val_dice_coeff": {self.channel_to_class[i]: dice_coeff[i] for i in range(num_classes)}}
         hausdorff = {"val_hausdorff": {self.channel_to_class[i]: hausdorff[i] for i in range(num_classes)}}
-        return {"dice_coeff": dice.cpu(), "hausdorff": hausdorff.cpu()}
+        return {"dice_coeff": dice, "hausdorff": hausdorff}
