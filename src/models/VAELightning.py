@@ -9,11 +9,8 @@ from src.losses.VAELoss import VAELoss
 from src.losses.DiceLoss import DiceLoss
 from solver import PolyLR
 
-from metrics.metrics import channel_wise_dice_score
-from monai.metrics.hausdorff_distance import compute_hausdorff_distance
-
-from torchmetrics import Dice#
 from monai.metrics.meandice import compute_dice
+from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
 class VAELightning(pl.LightningModule):
     def __init__(self, volume_shape, modalities=4, start_channels=32, num_classes=3) -> None:
@@ -71,7 +68,7 @@ class VAELightning(pl.LightningModule):
         pred = self.forward(x)
         
         # already averaged over batch (different methods available)
-        dice_coeff = channel_wise_dice_score(pred, y)
+        dice_coeff = compute_dice(pred, y, ignore_empty=False).mean(0)
 
         # average over batch
         hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
@@ -79,7 +76,7 @@ class VAELightning(pl.LightningModule):
         return {"dice_coeff": dice_coeff.cpu(), "hausdorff": hausdorff.cpu()}
 
 
-    def validation_epoch_end(self, outputs) -> Dict:
+    def validation_epoch_end(self, outputs):
         num_classes = len(self.channel_to_class)
 
         avg_dice_coeff = torch.stack([x['dice_coeff'] for x in outputs]).mean(0)
@@ -100,12 +97,29 @@ class VAELightning(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         pred = self.forward(x)
-        num_classes = len(self.channel_to_class)
-        dice_coeff = self.dice_metric(pred, y)
+        
+        # already averaged over batch (different methods available)
+        dice_coeff = compute_dice(pred, y, ignore_empty=False).mean(0)
 
         # average over batch
         hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
-        
-        dice = {"val_dice_coeff": {self.channel_to_class[i]: dice_coeff[i] for i in range(num_classes)}}
-        hausdorff = {"val_hausdorff": {self.channel_to_class[i]: hausdorff[i] for i in range(num_classes)}}
-        return {"dice_coeff": dice, "hausdorff": hausdorff}
+
+        return {"dice_coeff": dice_coeff, "hausdorff": hausdorff}
+
+    def test_step_end(self, outputs):
+        num_classes = len(self.channel_to_class)
+
+        avg_dice_coeff = torch.stack([x['dice_coeff'] for x in outputs]).mean(0)
+        avg_hausdorff_distance = torch.stack([x['hausdorff'] for x in outputs]).mean(0)
+
+        dice = {"val_dice_coeff": {self.channel_to_class[i]: avg_dice_coeff[i] for i in range(num_classes)}}
+        hausdorff = {"val_hausdorff": {self.channel_to_class[i]: avg_hausdorff_distance[i] for i in range(num_classes)}}
+        avg_overall_dice = {"val_avg_overall_dice": avg_dice_coeff.mean()}
+        dice.update(hausdorff)
+        dice.update(avg_overall_dice)
+        tensorboard_logs = dice
+
+        tensorboard_logs["step"] = self.current_epoch
+
+        self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
+        self.log("val_avg_overall_dice", avg_dice_coeff.mean())
