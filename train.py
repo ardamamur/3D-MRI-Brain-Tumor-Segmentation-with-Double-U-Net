@@ -1,8 +1,10 @@
 import configparser
 from models.UNet3D_v1 import UNet3d
+from models.double_u_net import *
 from solver import PolyLR
 from dataset.data import *
 #from models.UNet3D_V2 import *
+
 #from models.double_u_net import *
 #from models.VAE_net import * 
 from models.loss import *
@@ -18,16 +20,20 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Train():
-    def __init__(self, hyper_parameters):
-        self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
+    def __init__(self, hyper_parameters, model_name):
+        self.model_name = model_name
+        if self.model_name == "3dunet":
+            self.model =  UNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3, n_channels=hyper_parameters['init_channels'])
+        else:
+            self.model =  DoubleUNet3d(in_channels=hyper_parameters["in_channels"], n_classes=3)
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
-        self.criterion = BCEDiceLoss()
+        self.criterion = BCEDiceLossV2()
         self.phases = ["train", "val"]
         self.num_epochs = hyper_parameters["num_epochs"]
         self.accumulation_steps = hyper_parameters['accumulation_steps']
-        self.loaders = make_data_loaders()
+        self.loaders = make_data_loaders(mode="train", model_name=self.model_name)
         self.best_loss = float("inf")
         self.n_steps = hyper_parameters['n_steps']
         self.losses = {phase: [] for phase in self.phases}
@@ -37,12 +43,22 @@ class Train():
         self.jaccard_scores_WT = {phase: [] for phase in self.phases}
         self.jaccard_scores_TC = {phase: [] for phase in self.phases}
         self.jaccard_scores_ET = {phase: [] for phase in self.phases}
+        self.checkpoint_path = hyper_parameters['checkpoint_path']
 
     def _compute_loss_and_outputs(self, images: torch.Tensor, targets: torch.Tensor):
         images = images.to(device)
         targets = targets.to(device)
-        logits = self.model(images)
-        loss = self.criterion(logits, targets)
+        logits = None
+        loss = None
+        if self.model_name == "3dunet":
+            logits = self.model(images)
+            loss = self.criterion(logits, targets)
+        else:
+            logit1, logit2 = self.model(images)
+            loss1 = self.criterion(logit1, targets[:,0].unsqueeze(1))
+            loss2 = self.criterion(logit2, targets)
+            loss = loss1+ loss2
+            logits = logit2
         return loss, logits
 
     def _do_epoch(self, epoch:int, phase:str):
@@ -67,7 +83,7 @@ class Train():
             running_loss += loss.item()
             meter.update(logits.detach().cpu(),targets.detach().cpu())
             if (itr + 1) % self.n_steps == 0:
-                print("BCEDice loss: ", loss.item())
+                print("Dice loss: ", loss.item())
         
         epoch_loss = (running_loss * self.accumulation_steps) / total_batches
         metrics = meter.get_metrics()
@@ -78,10 +94,6 @@ class Train():
             " TC dice: " , metrics['dice_TC'] ,
             " ET dice: ", metrics['dice_ET'])
 
-        print("WT jaccard: ", metrics['iou_WT'],
-            " TC jaccard: ", metrics['iou_TC'],
-            " ET jaccard: ", metrics['iou_ET'])
-
         print("###################################")
         
         self.losses[phase].append(epoch_loss)
@@ -89,9 +101,9 @@ class Train():
         self.dice_scores_TC[phase].append(metrics['dice_TC'])
         self.dice_scores_ET[phase].append(metrics['dice_ET'])
 
-        self.jaccard_scores_WT[phase].append(metrics['iou_WT'])
-        self.jaccard_scores_TC[phase].append(metrics['iou_TC'])
-        self.jaccard_scores_ET[phase].append(metrics['iou_ET'])
+        #self.jaccard_scores_WT[phase].append(metrics['iou_WT'])
+        #self.jaccard_scores_TC[phase].append(metrics['iou_TC'])
+        #self.jaccard_scores_ET[phase].append(metrics['iou_ET'])
         
         return epoch_loss
 
@@ -102,27 +114,24 @@ class Train():
             with torch.no_grad():
                 val_loss = self._do_epoch(epoch, "val")
                 self.scheduler.step(val_loss)
-            if self.display_plot:
-                self._plot_train_history()
             if val_loss < self.best_loss:
                 print("Saved new checkpoint")
                 self.best_loss = val_loss
-                torch.save(self.model.state_dict(), "best_model.pth")
+                model_path = self.checkpoint_path + "best_model.pth"
+                torch.save(self.model.state_dict(), model_path)
             print()
         self._save_train_history()       
 
 
     def _save_train_history(self):
         """writing model weights and training logs to files."""
-        torch.save(self.model.state_dict(),
-                f"last_epoch_model.pth")
+        last_model_path = self.checkpoint_path + "last_epoch_model.pth"
+        torch.save(self.model.state_dict(),last_model_path)
 
         logs_ = [self.losses,
-                self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET,
-                self.jaccard_scores_WT, self.jaccard_scores_TC, self.jaccard_scores_ET]
+                self.dice_scores_WT, self.dice_scores_TC, self.dice_scores_ET]
 
-        log_names_ = ["_loss", "_dice_WT", "_dice_TC", "dice_ET",
-                    "_jaccard_WT", "_jaccard_TC", "_jaccard_ET"]
+        log_names_ = ["_loss", "_dice_WT", "_dice_TC", "dice_ET"]
 
         logs = [logs_[i][key] for i in list(range(len(logs_)))
                         for key in logs_[i]]
@@ -130,9 +139,10 @@ class Train():
                     for i in list(range(len(logs_))) 
                     for key in logs_[i]
                     ]
+        log_path = self.checkpoint_path + "train_log.csv"
         pd.DataFrame(
             dict(zip(log_names, logs))
-        ).to_csv("train_log.csv", index=False)
+        ).to_csv(log_path, index=False)
 
     def load_predtrain_model(self, state_path: str):
         self.model.load_state_dict(torch.load(state_path))
@@ -157,39 +167,35 @@ def main():
         "shapes" : shapes,
         "num_epochs" : int(params['num_epochs']),
         "input_shape" : (int(shapes[0]), int(shapes[1]), int(shapes[2])),
-        "accumulation_steps" : 4 / int(params['batch_size']),
-        "n_steps" : 5
+        "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
+        "n_steps" : 25,
+        "checkpoint_path" : params['checkpoint_path'],
+        "model_name" : params["model_name"]
     
     }
     print("hyper parameters:", hyper_parameters)
     
-    trainer = Train(hyper_parameters=hyper_parameters)
+    trainer = Train(hyper_parameters=hyper_parameters, model_name=hyper_parameters['model_name'])
     
     if params['pre_trained'] == "True":
-        trainer.load_predtrain_model(params['pre_trained_path'])
+        model_path = params['pre_trained_path'] + params['pre_trained_model']
+        trainer.load_predtrain_model(model_path)
         
-        # if need - load the logs.      
-        train_logs = pd.read_csv("train_log.csv")
+        
+        # if need - load the logs.
+        log_path = params['pre_trained_path'] + 'train_log.csv'
+        train_logs = pd.read_csv(log_path)
         trainer.losses["train"] =  train_logs.loc[:, "train_loss"].to_list()
         trainer.losses["val"] =  train_logs.loc[:, "val_loss"].to_list()
 
 
         trainer.dice_scores_WT["train"] = train_logs.loc[:, "train_dice_WT"].to_list()
         trainer.dice_scores_TC["train"] = train_logs.loc[:, "train_dice_TC"].to_list()
-        trainer.dice_scores_ET["train"] = train_logs.loc[:, "train_dice_ET"].to_list()
+        trainer.dice_scores_ET["train"] = train_logs.loc[:, "traindice_ET"].to_list()
 
         trainer.dice_scores_WT["val"] = train_logs.loc[:, "val_dice_WT"].to_list()
         trainer.dice_scores_TC["val"] = train_logs.loc[:, "val_dice_TC"].to_list()
-        trainer.dice_scores_ET["val"] = train_logs.loc[:, "val_dice_ET"].to_list()
-
-
-        trainer.jaccard_scores_WT["train"] = train_logs.loc[:, "train_jaccard_WT"].to_list()
-        trainer.jaccard_scores_TC["train"] = train_logs.loc[:, "train_jaccard_TC"].to_list()
-        trainer.jaccard_scores_ET["train"] = train_logs.loc[:, "train_jaccard_ET"].to_list()
-
-        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
-        trainer.jaccard_scores_TC["val"] = train_logs.loc[:, "val_jaccard"].to_list()
-        trainer.jaccard_scores_ET["val"] = train_logs.loc[:, "val_jaccard"].to_list()
+        trainer.dice_scores_ET["val"] = train_logs.loc[:, "valdice_ET"].to_list()
 
     print("START TRAINING")         
     trainer.run()
