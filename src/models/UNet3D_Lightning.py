@@ -48,8 +48,9 @@ class UNet3D_Lightning(pl.LightningModule):
     def training_step(self, batch):
         x, y = batch
         y_hat = self.model(x)
-        total_loss =  self.bce_dice_loss()
+        total_loss =  self.bce_dice_loss(y_hat, y)
         return {"loss": total_loss.cpu()}
+        
 
     def training_epoch_end(self, outputs: Sequence[Dict[str, torch.Tensor]]) -> Dict:
         # assert outputs[0]["kl_loss"].requires_grad == False

@@ -57,7 +57,7 @@ def main(model_name):
         monitor="step")
 
 
-    trainer = Trainer(accelerator="gpu", devices=1, max_epochs=20, check_val_every_n_epoch=1,
+    trainer = Trainer(accelerator="gpu", devices=1, max_epochs=50, check_val_every_n_epoch=1,
                     callbacks=[checkpoint_best, checkpoint_last], logger=logger,
     )
     
