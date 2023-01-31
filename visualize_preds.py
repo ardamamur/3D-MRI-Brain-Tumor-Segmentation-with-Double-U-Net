@@ -17,7 +17,7 @@ from tqdm import tqdm
 #from testing_legacy import test
 model_name = "3dunet"
 
-train_path = "/cluster/51/arda/dataset/train"
+train_path = "/home/ardamamur/TUM/ML3D/dataset/train"
 data = BraTSDataset(train_path, training=False)
 print(len(data))
 proportions = [0.9, 0.1]
@@ -31,9 +31,9 @@ train, val = torch.utils.data.random_split(
     data, lengths,
     generator=gen
 )
-best_model_path = "/cluster/51/arda/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/runs/3dunet/best_models/name=0_epoch=46_val_avg_overall_dice=0.85.ckpt"
+best_model_path = "runs/3dunet/best_models/name=0_epoch=46_val_avg_overall_dice=0.85.ckpt"
 val_loader = DataLoader(val, batch_size=1, num_workers=16, pin_memory=True, shuffle=False)
-model = UNet3D_Lightning.load_from_checkpoint(best_model_path, model_name, data.crop_size)
+model = UNet3D_Lightning.load_from_checkpoint(best_model_path, model_name=model_name, volume_shape=data.crop_size)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 predictions = []
 model.to(device)
