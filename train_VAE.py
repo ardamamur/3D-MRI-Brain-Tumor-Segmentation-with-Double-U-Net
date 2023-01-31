@@ -46,7 +46,7 @@ def main():
 
 
     trainer = Trainer(accelerator="gpu", devices=1, max_epochs=300, check_val_every_n_epoch=1,
-                      callbacks=[checkpoint_best, checkpoint_last], logger=logger,
+                    callbacks=[checkpoint_best, checkpoint_last], logger=logger,
     )
     
     model = model.cuda()
