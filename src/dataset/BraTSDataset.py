@@ -85,7 +85,7 @@ class BraTSDataset(Dataset):
         """
         transformations = tio.Compose([montransforms.RandSpatialCrop(roi_size=self.crop_size, random_center=True, random_size=False),
                                        tio.RandomFlip(axes=(0, 1, 2)),
-                                       #tio.RandomAffine(scales=0.1, isotropic=True)
+                                       tio.RandomAffine(scales=0.1, isotropic=True)
                                        ])
         return transformations
 
