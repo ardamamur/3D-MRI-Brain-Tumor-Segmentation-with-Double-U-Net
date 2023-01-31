@@ -4,7 +4,7 @@ from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader, random_split
 
 from src.dataset.BraTSDataset import BraTSDataset
-from src.models.VAELightning import VAELightning
+from src.models.UNet3D_Lightning import UNet3D_Lightning
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -25,7 +25,15 @@ def main():
     val_loader = DataLoader(val, batch_size=1, num_workers=16, pin_memory=True)
     experiment = base
     logger = TensorBoardLogger(experiment+"/logs/")
-    model = VAELightning(data.crop_size)
+    hparams = {
+        "volume_shape" : data.crop_size,
+        "modalities" : 4,
+        "start_channels" : 16,
+        "num_classes" : 3,
+        "learning_rate" : 1e-4,
+        "weight_decay" : 1e-5
+    }
+    model = UNet3D_Lightning(hparams)
 
     checkpoint_best = ModelCheckpoint(
         dirpath=experiment+"/best_models/",
