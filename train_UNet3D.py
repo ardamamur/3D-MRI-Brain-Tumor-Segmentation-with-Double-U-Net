@@ -3,9 +3,8 @@ import torch
 from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader, random_split
 
-from src.dataset.BraTSDataset import BraTSDataset
+from src.dataset.BraTSDataset_Unet import BraTSDataset
 from src.models.UNet3D_Lightning import UNet3D_Lightning
-
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
