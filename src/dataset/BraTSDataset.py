@@ -15,10 +15,13 @@ from torch.utils.data import Dataset
 
 
 class BraTSDataset(Dataset):
-    def __init__(self, path, crop_size=(160, 192, 128), training=True) -> None:
+    def __init__(self, path, crop_size=(160, 192, 128), training=True, patientsdir=None) -> None:
         super().__init__()
         self.path = Path(path)
-        self.patient_root_dirs = os.listdir(self.path)
+        if patientsdir is not None:
+            self.patient_root_dirs = patientsdir
+        else:
+            self.patient_root_dirs = os.listdir(self.path)
 
         # careful: order matters. Last one needs to be seg
         self.modes = ["t1", "t2", "t1ce", "flair", "seg"]
@@ -26,6 +29,7 @@ class BraTSDataset(Dataset):
         self.crop_size = crop_size
 
         self.transformations = self.get_transformations()
+        self.test_transformations = self.get_test_transformations()
 
     def __len__(self):
         return len(self.patient_root_dirs)
@@ -53,6 +57,8 @@ class BraTSDataset(Dataset):
 
         if self.training:
             volumes = self.transformations(volumes)
+        else:
+            volumes = self.test_transformations(volumes)
 
 
         return volumes[:-3], volumes[-3:]
@@ -79,10 +85,12 @@ class BraTSDataset(Dataset):
         """
         transformations = tio.Compose([montransforms.RandSpatialCrop(roi_size=self.crop_size, random_center=True, random_size=False),
                                        tio.RandomFlip(axes=(0, 1, 2)),
-                                       tio.RandomAffine(scales=0.1, isotropic=True)
+                                       #tio.RandomAffine(scales=0.1, isotropic=True)
                                        ])
         return transformations
 
+    def get_test_transformations(self):
+        return montransforms.SpatialPad((-1, -1, 160))
 
     def random_crop(self,x,y):
         """
