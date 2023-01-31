@@ -3,7 +3,7 @@ import torch
 from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader, random_split
 
-from src.dataset.BraTSDataset_Unet import BraTSDataset
+from src.dataset.BraTSDataset_Unet import BraTSDataset_Unet
 from src.models.UNet3D_Lightning import UNet3D_Lightning
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -11,12 +11,17 @@ from pytorch_lightning.loggers import TensorBoardLogger
 def main(model_name):
     base = "/cluster/51/arda/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/runs/"
     train_path = "/cluster/51/arda/dataset/train"
-    data = BraTSDataset(train_path, training=True)
-    
+    data = BraTSDataset_Unet(train_path, training=True)
+    print(len(data))
+    proportions = [0.9, 0.1]
+    lengths = [int(p * len(data)) for p in proportions]
+    lengths[-1] = len(data) - sum(lengths[:-1])
+    print(lengths[0])
+    print(lengths[1])
     gen = torch.Generator()
     gen.manual_seed(0)
     train, val = torch.utils.data.random_split(
-        data, [0.9, 0.1],
+        data, lengths,
         generator=gen
     )
 
@@ -34,7 +39,7 @@ def main(model_name):
         "weight_decay" : 1e-5
     }
 
-    model = UNet3D_Lightning(hparams, model_name = model_name)
+    model = UNet3D_Lightning(model_name, data.crop_size)
 
     checkpoint_best = ModelCheckpoint(
         dirpath=experiment+"/best_models/",

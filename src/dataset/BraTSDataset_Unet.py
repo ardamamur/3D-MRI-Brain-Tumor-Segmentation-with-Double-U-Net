@@ -4,6 +4,7 @@ import random
 import torch
 import numpy as np
 import os
+import glob
 import nibabel as nib
 import torchvision
 import torchio as tio
@@ -14,14 +15,14 @@ from pathlib import Path
 from torch.utils.data import Dataset
 
 
-class BraTSDataset(Dataset):
+class BraTSDataset_Unet(Dataset):
     def __init__(self, path, crop_size=(160, 192, 128), training=True, patientsdir=None) -> None:
         super().__init__()
         self.path = Path(path)
         if patientsdir is not None:
             self.patient_root_dirs = patientsdir
         else:
-            self.patient_root_dirs = os.listdir(self.path)
+            self.patient_root_dirs = glob.glob(os.path.join(self.path, "BraTS2021*"))
 
         # careful: order matters. Last one needs to be seg
         self.modes = ["t1", "t2", "t1ce", "flair", "seg"]
@@ -43,6 +44,7 @@ class BraTSDataset(Dataset):
             patient_id = os.path.split(patient_dir)[-1]
             volume_path = os.path.join(patient_dir, patient_id + "_" + m + ".nii.gz")
             vol = nib.load(volume_path).get_data()
+            #print(vol.shape)
             #vol = nib.load(str(self.path / patient_dir / patient_dir) + "_" + m + ".nii.gz").get_data()
             if not m == "seg":
                 im_volumes.append(vol)
