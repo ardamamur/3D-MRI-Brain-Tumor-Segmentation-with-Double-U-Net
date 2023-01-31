@@ -68,10 +68,10 @@ class VAELightning(pl.LightningModule):
         pred = self.forward(x)
         
         # already averaged over batch (different methods available)
-        dice_coeff = compute_dice(pred, y, ignore_empty=False).mean(0)
+        dice_coeff = compute_dice(pred, y, ignore_empty=False)
 
         # average over batch
-        hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
+        hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95)
 
         return {"dice_coeff": dice_coeff.cpu(), "hausdorff": hausdorff.cpu()}
 
@@ -79,11 +79,15 @@ class VAELightning(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         num_classes = len(self.channel_to_class)
 
-        avg_dice_coeff = torch.stack([x['dice_coeff'] for x in outputs]).mean(0)
-        avg_hausdorff_distance = torch.stack([x['hausdorff'] for x in outputs]).mean(0)
+        avg_dice_coeff = torch.cat([x['dice_coeff'] for x in outputs]).mean(0)
+        avg_hausdorff_distance = torch.cat([x['hausdorff'] for x in outputs])
+
+        hd = []
+        for i in range(num_classes):
+            hd.append(avg_hausdorff_distance[avg_hausdorff_distance[:, i].isfinite(), i].mean())
 
         dice = {"val_dice_coeff": {self.channel_to_class[i]: avg_dice_coeff[i] for i in range(num_classes)}}
-        hausdorff = {"val_hausdorff": {self.channel_to_class[i]: avg_hausdorff_distance[i] for i in range(num_classes)}}
+        hausdorff = {"val_hausdorff": {self.channel_to_class[i]: hd[i] for i in range(num_classes)}}
         avg_overall_dice = {"val_avg_overall_dice": avg_dice_coeff.mean()}
         dice.update(hausdorff)
         dice.update(avg_overall_dice)
