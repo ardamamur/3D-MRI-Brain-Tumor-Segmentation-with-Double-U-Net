@@ -20,7 +20,7 @@ class DoubleConv(nn.Module):
             #nn.BatchNorm3d(out_channels),
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
             nn.ReLU(inplace=True)
-          )
+        )
 
     def forward(self,x):
         return self.double_conv(x)
