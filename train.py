@@ -29,7 +29,7 @@ class Train():
         self.model = self.model.to(device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=hyper_parameters['lr'], weight_decay=hyper_parameters['weight_decay'])
         self.scheduler = PolyLR(self.optimizer, max_epoch=hyper_parameters['num_epochs'], power=0.9)
-        self.criterion = DiceLossV2()
+        self.criterion = BCEDiceLossV2()
         self.phases = ["train", "val"]
         self.num_epochs = hyper_parameters["num_epochs"]
         self.accumulation_steps = hyper_parameters['accumulation_steps']
@@ -168,7 +168,7 @@ def main():
         "num_epochs" : int(params['num_epochs']),
         "input_shape" : (int(shapes[0]), int(shapes[1]), int(shapes[2])),
         "accumulation_steps" : int(params['accumulation_steps']) / int(params['batch_size']),
-        "n_steps" : 10,
+        "n_steps" : 25,
         "checkpoint_path" : params['checkpoint_path'],
         "model_name" : params["model_name"]
     
@@ -180,6 +180,7 @@ def main():
     if params['pre_trained'] == "True":
         model_path = params['pre_trained_path'] + params['pre_trained_model']
         trainer.load_predtrain_model(model_path)
+        
         
         # if need - load the logs.
 #        log_path = params['pre_trained_path'] + 'train_log.csv'
