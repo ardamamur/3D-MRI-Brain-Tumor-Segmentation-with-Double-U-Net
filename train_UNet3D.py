@@ -9,8 +9,8 @@ from src.models.UNet3D_Lightning import UNet3D_Lightning
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
-def main():
-    base = "/cluster/51/arda/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/runs/UNet3D/"
+def main(model_name):
+    base = "/cluster/51/arda/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/runs/"
     train_path = "/cluster/51/arda/dataset/train"
     data = BraTSDataset(train_path, training=True)
     
@@ -23,7 +23,8 @@ def main():
 
     train_loader = DataLoader(train, batch_size=1, num_workers=16, pin_memory=True)
     val_loader = DataLoader(val, batch_size=1, num_workers=16, pin_memory=True)
-    experiment = base
+    name = model_name
+    experiment = base+name
     logger = TensorBoardLogger(experiment+"/logs/")
     hparams = {
         "volume_shape" : data.crop_size,
@@ -33,7 +34,8 @@ def main():
         "learning_rate" : 1e-4,
         "weight_decay" : 1e-5
     }
-    model = UNet3D_Lightning(hparams)
+
+    model = UNet3D_Lightning(hparams, model_name = model_name)
 
     checkpoint_best = ModelCheckpoint(
         dirpath=experiment+"/best_models/",
@@ -60,4 +62,6 @@ def main():
     trainer.fit(model, train_loader, val_loader)
 
 if __name__ == "__main__":
-    main()
+    model_name = "3dunet"
+    main(model_name)
+

@@ -12,7 +12,7 @@ from monai.metrics.meandice import compute_dice
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
 class UNet3D_Lightning(pl.LightningModule):
-    def __init__(self, hparams) -> None:
+    def __init__(self, hparams, model_name) -> None:
         super().__init__()
         """
         hparams = {
@@ -27,9 +27,14 @@ class UNet3D_Lightning(pl.LightningModule):
         # volume_shape, modalities=4, start_channels=16, num_classes=3
         # start_channels : init_channels = 16
         self.hparams = hparams
-        self.model = UNet3d(in_channels=hparams['modalities'],
-                            n_classes=hparams['num_classes'], 
-                            n_channels=hparams['start_channels'])
+        if model_name == "3dunet":
+            self.model = UNet3d(in_channels=hparams['modalities'],
+                                n_classes=hparams['num_classes'], 
+                                n_channels=hparams['start_channels'])
+        else:
+            self.model =  DoubleUNet3d(in_channels=hparams['modalities'],
+                                        n_classes=hparams['num_classes'])
+
         self.bce_dice_loss = BCEDiceLoss()
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
 
