@@ -28,6 +28,7 @@ class UNet3D_Lightning(pl.LightningModule):
 
         self.bce_dice_loss = BCEDiceLoss()
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
+        self.model_type = model_name
 
     def forward(self, x):
         pred = self.model(x)
@@ -47,10 +48,17 @@ class UNet3D_Lightning(pl.LightningModule):
 
     def training_step(self, batch):
         x, y = batch
-        y_hat = self.model(x)
-        total_loss =  self.bce_dice_loss(y_hat, y)
-        return {"loss": total_loss.cpu()}
         
+        if self.model_type == "3dunet":
+            y_hat = self.model(x)
+            total_loss =  self.bce_dice_loss(y_hat, y)
+            return {"loss": total_loss.cpu()}
+        else:
+            y_hat1, y_hat2 = self.model(x)
+            loss1 =  self.bce_dice_loss(y_hat1, y[:,0].unsqueeze(1))
+            loss2 =  self.bce_dice_loss(y_hat2, y)
+            total_loss = loss1.cpu() + loss2.cpu()
+            return {"loss": total_loss.cpu()}        
 
     def training_epoch_end(self, outputs: Sequence[Dict[str, torch.Tensor]]) -> Dict:
         # assert outputs[0]["kl_loss"].requires_grad == False
