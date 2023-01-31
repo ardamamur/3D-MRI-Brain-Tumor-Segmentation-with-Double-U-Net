@@ -31,6 +31,7 @@ class UNet3D_Lightning(pl.LightningModule):
                             n_classes=hparams['num_classes'], 
                             n_channels=hparams['start_channels'])
         self.bce_dice_loss = BCEDiceLoss()
+        self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
 
         def forward(self, x):
             pred = self.model(x)
@@ -60,6 +61,7 @@ class UNet3D_Lightning(pl.LightningModule):
             tensorboard_logs = {"train_total_loss": avg_total_loss}
             tensorboard_logs["step"] = self.current_epoch
             self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
+
         def validation_step(self, batch, batch_idx):
             x, y = batch
             pred = self.forward(x)
@@ -70,9 +72,55 @@ class UNet3D_Lightning(pl.LightningModule):
             # average over batch
             hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
 
-            return {"dice_coeff": dice_coeff.cpu(), "hausdorff": hausdorff.cpu()}  
+            return {"dice_coeff": dice_coeff.cpu(), "hausdorff": hausdorff.cpu()}
 
+        def validation_epoch_end(self, outputs):
+            num_classes = len(self.channel_to_class)
+
+            avg_dice_coeff = torch.stack([x['dice_coeff'] for x in outputs]).mean(0)
+            avg_hausdorff_distance = torch.stack([x['hausdorff'] for x in outputs]).mean(0)
+
+            dice = {"val_dice_coeff": {self.channel_to_class[i]: avg_dice_coeff[i] for i in range(num_classes)}}
+            hausdorff = {"val_hausdorff": {self.channel_to_class[i]: avg_hausdorff_distance[i] for i in range(num_classes)}}
+            avg_overall_dice = {"val_avg_overall_dice": avg_dice_coeff.mean()}
+            dice.update(hausdorff)
+            dice.update(avg_overall_dice)
+            tensorboard_logs = dice
+
+            tensorboard_logs["step"] = self.current_epoch
+
+            self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
+            self.log("val_avg_overall_dice", avg_dice_coeff.mean())
+
+
+        def test_step(self, batch, batch_idx):
+            x, y = batch
+            pred = self.forward(x)
             
+            # already averaged over batch (different methods available)
+            dice_coeff = compute_dice(pred, y, ignore_empty=False).mean(0)
 
+            # average over batch
+            hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
+
+            return {"dice_coeff": dice_coeff, "hausdorff": hausdorff}
+            
+        def test_step_end(self, outputs):
+            num_classes = len(self.channel_to_class)
+
+            avg_dice_coeff = torch.stack([x['dice_coeff'] for x in outputs]).mean(0)
+            avg_hausdorff_distance = torch.stack([x['hausdorff'] for x in outputs]).mean(0)
+
+            dice = {"val_dice_coeff": {self.channel_to_class[i]: avg_dice_coeff[i] for i in range(num_classes)}}
+            hausdorff = {"val_hausdorff": {self.channel_to_class[i]: avg_hausdorff_distance[i] for i in range(num_classes)}}
+            avg_overall_dice = {"val_avg_overall_dice": avg_dice_coeff.mean()}
+            dice.update(hausdorff)
+            dice.update(avg_overall_dice)
+            tensorboard_logs = dice
+
+            tensorboard_logs["step"] = self.current_epoch
+
+            self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
+            self.log("val_avg_overall_dice", avg_dice_coeff.mean())
 
 
