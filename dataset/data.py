@@ -144,6 +144,8 @@ def make_data_loaders(mode:str, model_name:str):
     config = configparser.ConfigParser()
     config.read('config.ini')
     params = config['params']
+    train_dataset = params['train_dataset']
+    create_train_val_set(train_dataset)
     modes = params['modes'].split(",")
     shapes = params['input_shape'].split(",")
     input_shape = (int(shapes[0]), int(shapes[1]), int(shapes[2]))
