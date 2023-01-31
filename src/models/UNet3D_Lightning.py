@@ -34,12 +34,15 @@ class UNet3D_Lightning(pl.LightningModule):
 
         def forward(self, x):
             pred = self.model(x)
+            """
+            for inference
+            """
             pred = torch.sigmoid(pred)
             pred = (pred > 0.5).float()
             return pred
 
         def configure_optimizers(self):
-            optimizer = torch.optim.AdamW(self.parameters(),
+            optimizer = torch.optim.AdamW(self.model.parameters(),
                                         lr=self.hparams['learning_rate'], 
                                         weight_decay=self.hparams['weight_decay'])
 
@@ -48,7 +51,27 @@ class UNet3D_Lightning(pl.LightningModule):
         def training_step(self, batch):
             x, y = batch
             y_hat = self.model(x)
-            bce_dice_loss =  self.bce_dice_loss()
+            total_loss =  self.bce_dice_loss()
+            return {"loss": total_loss.cpu()}
+
+        def training_epoch_end(self, outputs: Sequence[Dict[str, torch.Tensor]]) -> Dict:
+            # assert outputs[0]["kl_loss"].requires_grad == False
+            avg_total_loss = torch.stack([x['loss'] for x in outputs]).mean()
+            tensorboard_logs = {"train_total_loss": avg_total_loss}
+            tensorboard_logs["step"] = self.current_epoch
+            self.logger.log_metrics(tensorboard_logs, step=self.current_epoch)
+        def validation_step(self, batch, batch_idx):
+            x, y = batch
+            pred = self.forward(x)
+            
+            # already averaged over batch (different methods available)
+            dice_coeff = compute_dice(pred, y, ignore_empty=False).mean(0)
+
+            # average over batch
+            hausdorff = compute_hausdorff_distance(pred, y, include_background=True, percentile=95).mean(0)
+
+            return {"dice_coeff": dice_coeff.cpu(), "hausdorff": hausdorff.cpu()}  
+
             
 
 
