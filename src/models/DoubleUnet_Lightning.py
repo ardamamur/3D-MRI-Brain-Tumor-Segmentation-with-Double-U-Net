@@ -30,6 +30,7 @@ class DoubleUnet_Lightning(pl.LightningModule):
         self.model = UNet3d(in_channels=hparams['modalities'],
                             n_classes=hparams['num_classes'], 
                             n_channels=hparams['start_channels'])
+        
         self.bce_dice_loss = BCEDiceLoss()
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
 

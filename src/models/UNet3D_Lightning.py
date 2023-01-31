@@ -19,19 +19,28 @@ class UNet3D_Lightning(pl.LightningModule):
         # start_channels : init_channels = 16
         #self.hparams = hparams
         if model_name == "3dunet":
+            self.model_type = "3dunet"
             self.model = UNet3d(in_channels=modalities,
                                 n_classes=num_classes, 
                                 n_channels=start_channels)
         else:
-            self.model =  doubleUNet3d(in_channels=modalities,
+            self.model_type = "double_unet"
+            self.model =  DoubleUNet3d(in_channels=modalities,
                                         n_classes=num_classes)
+            self.model.enc1.freeze()
+
 
         self.bce_dice_loss = BCEDiceLoss()
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
         self.model_type = model_name
 
     def forward(self, x):
-        pred = self.model(x)
+        if self.model_type == "3dunet":
+            pred = self.model(x)
+
+        else:
+            out1, pred = self.model(x)
+            
         """
         for inference
         """

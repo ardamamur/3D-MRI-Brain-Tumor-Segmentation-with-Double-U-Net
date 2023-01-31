@@ -66,6 +66,6 @@ def main(model_name):
     trainer.fit(model, train_loader, val_loader)
 
 if __name__ == "__main__":
-    model_name = "3dunet"
+    model_name = "double_unet"
     main(model_name)
 
