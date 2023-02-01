@@ -131,7 +131,7 @@ class DoubleUNet3d(nn.Module):
         self.dec1 = Decoder1(in_channels)
         self.enc2 = Encoder2(in_channels)
         self.dec2 = Decoder2(in_channels)
-        self.out_conv = OutConv(in_channels=17, num_classes=n_classes)
+        self.conv = nn.Conv3d(n_classes+1, n_classes, kernel_size = 1)
     def forward(self, x):
         x1_ls = []
         skip_layers1_ls = []
@@ -151,7 +151,7 @@ class DoubleUNet3d(nn.Module):
         x4, skip_layers2 = self.enc2(x3)
         out2 = self.dec2(x4,skip_layers1,skip_layers2) # out_channel = 16
         out = torch.cat([out2, out1],dim=1) # out_channel = 17
-        mask = self.out_conv(out)
-        #mask = self.conv(out)
+        #mask = self.out_conv(out)
+        mask = self.conv(out)
         
         return out1, mask
