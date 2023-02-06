@@ -4,7 +4,7 @@ from pytorch_lightning import Trainer
 from torch.utils.data import DataLoader, random_split
 
 from src.dataset.BraTSDataset import BraTSDataset
-from src.models.VAELightning import VAELightning
+from src.lightningmodules.VAELightning import VAELightning
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -46,7 +46,7 @@ def main():
 
 
     trainer = Trainer(accelerator="gpu", devices=1, max_epochs=300, check_val_every_n_epoch=1,
-                      callbacks=[checkpoint_best, checkpoint_last], logger=logger,
+                    callbacks=[checkpoint_best, checkpoint_last], logger=logger,
     )
     
     model = model.cuda()
