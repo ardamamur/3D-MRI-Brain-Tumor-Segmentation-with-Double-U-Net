@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -39,6 +40,10 @@ class Encoder1(nn.Module):
 
     def forward(self, x):
         return self.model(x)
+
+    def freeze(self):
+        for param in self.model.parameters():
+            param.requires_grad = False
     
 class Decoder1(nn.Module):
     def __init__(self, in_channels):
@@ -81,6 +86,24 @@ class Encoder2(nn.Module):
 
         return x5, skip_layers
 
+class OutConv(nn.Module):
+    def __init__(self, in_channels, num_classes, num_groups=8):
+        super().__init__()
+        self.double_conv = nn.Sequential(
+            nn.Conv3d(in_channels, 8, kernel_size=3, stride=1, padding=1),
+            #nn.BatchNorm3d(out_channels),
+            nn.GroupNorm(num_groups=num_groups, num_channels=8),
+            nn.ReLU(inplace=True),
+
+            nn.Conv3d(8, num_classes, kernel_size=1, stride=1, padding=1),
+            #nn.BatchNorm3d(out_channels),
+            #nn.GroupNorm(num_groups=num_groups, num_channels=num_classes),
+            #nn.ReLU(inplace=True)
+        )
+
+    def forward(self,x):
+        return self.double_conv(x)
+
 
 class Decoder2(nn.Module):
     def __init__(self,in_channels = 4, n_classes = 3) :
@@ -90,7 +113,7 @@ class Decoder2(nn.Module):
         self.dec2 = Up(256+ 128+ self.in_channels*64, 128)
         self.dec3 = Up(128+ 64+ self.in_channels*64, 64)
         self.dec4 = Up(80+ self.in_channels, 32)
-        self.out = un.Out(32, n_classes)
+        self.out = un.Out(32, 16)
 
     def forward(self, x, skip_layers1, skip_layers2):
         x1 = self.dec1(x,skip_layers1[3],skip_layers2[3])
@@ -126,8 +149,9 @@ class DoubleUNet3d(nn.Module):
         out1 = self.dec1(x1, skip_layers1)
         x3 = torch.mul(out1, x)
         x4, skip_layers2 = self.enc2(x3)
-        out2 = self.dec2(x4,skip_layers1,skip_layers2)
-        out = torch.cat([out2, out1],dim=1)
+        out2 = self.dec2(x4,skip_layers1,skip_layers2) # out_channel = 16
+        out = torch.cat([out2, out1],dim=1) # out_channel = 17
+        #mask = self.out_conv(out)
         mask = self.conv(out)
         
         return out1, mask
