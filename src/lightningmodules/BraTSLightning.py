@@ -5,7 +5,7 @@ import torch
 from monai.metrics.meandice import compute_dice
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
-class BratsLightning(pl.LightningModule):
+class BraTSLightning(pl.LightningModule):
     def __init__(self) -> None:
         super().__init__()
         self.channel_to_class = {0: "WT", 1: "TC", 2: "ET"}
