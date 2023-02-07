@@ -1,4 +1,4 @@
-# Note that this is the smoothed version: union term has squared sub-terms
+# Note that this is the soft-dice version: union term has squared sub-terms
 
 import numpy as np
 

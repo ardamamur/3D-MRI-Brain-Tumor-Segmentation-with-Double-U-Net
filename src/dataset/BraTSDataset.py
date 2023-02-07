@@ -91,17 +91,3 @@ class BraTSDataset(Dataset):
 
     def get_test_transformations(self):
         return montransforms.SpatialPad((-1, -1, 160))
-
-    def random_crop(self,x,y):
-        """
-        Args:
-            x: 4d array, [channel, h, w, d]
-        """
-        crop_size = self.crop_size
-        height, width, depth = x.shape[-3:]
-        sx = random.randint(0, height - crop_size[0] - 1)
-        sy = random.randint(0, width - crop_size[1] - 1)
-        sz = random.randint(0, depth - crop_size[2] - 1)
-        crop_volume = x[:, sx:sx + crop_size[0], sy:sy + crop_size[1], sz:sz + crop_size[2]]
-
-        return crop_volume, crop_seg
