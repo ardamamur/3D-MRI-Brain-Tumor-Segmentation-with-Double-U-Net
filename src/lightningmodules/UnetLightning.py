@@ -3,13 +3,13 @@ import torch
 
 from src.models.UNet3D_v1 import *
 from src.models.double_u_net import *
-from src.losses.UNet3D_Loss import BCEDiceLoss
-from src.lightningmodules.BratsLightning import BratsLightning
+from losses.BCEDiceLoss import BCEDiceLoss
+from lightningmodules.BraTSLightning import BraTSLightning
 
 from monai.metrics.meandice import compute_dice
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
-class UnetLightning(BratsLightning):
+class UnetLightning(BraTSLightning):
     def __init__(self, modalities=4, start_channels=16, num_classes=3,
                  total_iterations=300, learning_rate=1e-4, weight_decay=1e-5) -> None:
         super().__init__()

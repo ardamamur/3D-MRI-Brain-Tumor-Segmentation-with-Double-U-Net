@@ -6,7 +6,7 @@ import torch
 
 from src.models.UNet3D_v1 import *
 from src.models.double_u_net import *
-from src.losses.UNet3D_Loss import BCEDiceLoss
+from losses.BCEDiceLoss import BCEDiceLoss
 
 from monai.metrics.meandice import compute_dice
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance

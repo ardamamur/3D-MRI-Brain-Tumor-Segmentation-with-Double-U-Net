@@ -1,12 +1,12 @@
 import torch
 from typing import Dict, Sequence
 
-from src.lightningmodules.BratsLightning import BratsLightning
+from lightningmodules.BraTSLightning import BraTSLightning
 from src.models.VAE_net import Decoder, Encoder, VariationalDecoder
 from src.losses.VAELoss import VAELoss
 from src.losses.DiceLoss import DiceLoss
 
-class VAELightning(BratsLightning):
+class VAELightning(BraTSLightning):
     def __init__(self, volume_shape, modalities=4, start_channels=32, num_classes=3, total_iterations=300,
                 learning_rate=1e-4, weight_decay=1e-5) -> None:
         super().__init__()
