@@ -1,0 +1,13 @@
+trainer:
+  default_root_dir: /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/Unet/01
+ckpt_path: null
+model:
+  class_path: src.lightningmodules.UnetLightning.UnetLightning
+  init_args:
+    modalities: 4
+    start_channels: 16
+    num_classes: 3
+    total_iterations: 100
+    learning_rate: 0.0001
+    weight_decay: 1.0e-05
+ckpt_path: null
