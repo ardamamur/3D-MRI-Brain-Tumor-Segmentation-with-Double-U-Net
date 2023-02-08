@@ -10,8 +10,20 @@ from monai.metrics.meandice import compute_dice
 from monai.metrics.hausdorff_distance import compute_hausdorff_distance
 
 class UnetLightning(BraTSLightning):
-    def __init__(self, modalities=4, start_channels=16, num_classes=3,
-                 total_iterations=300, learning_rate=1e-4, weight_decay=1e-5) -> None:
+    def __init__(self, modalities: int = 4, start_channels: int = 16,
+                 num_classes: int = 3,
+                 total_iterations: int = 300, 
+                 learning_rate: float = 1e-4, weight_decay: float = 1e-5) -> None:
+        """3D Unet standard model
+
+        Args:
+            modalities (int, optional): Number of MRI modes. Defaults to 4.
+            start_channels (int, optional): Num Channels after first conv. Defaults to 16.
+            num_classes (int, optional): Output (tumor) classes. Defaults to 3.
+            total_iterations (int, optional): max epochs. Defaults to 300.
+            learning_rate (float, optional): t0 learning rate. Defaults to 1e-4.
+            weight_decay (float, optional): parameter regularization. Defaults to 1e-5.
+        """        
         super().__init__()
         self.model = UNet3d(in_channels=modalities,
                             n_classes=num_classes, 

@@ -1,5 +1,5 @@
 import torch
-from typing import Dict, Sequence
+from typing import Dict, Sequence, Tuple
 
 from lightningmodules.BraTSLightning import BraTSLightning
 from src.models.VAE_net import Decoder, Encoder, VariationalDecoder
@@ -7,8 +7,22 @@ from src.losses.VAELoss import VAELoss
 from src.losses.DiceLoss import DiceLoss
 
 class VAELightning(BraTSLightning):
-    def __init__(self, volume_shape, modalities=4, start_channels=32, num_classes=3, total_iterations=300,
-                learning_rate=1e-4, weight_decay=1e-5) -> None:
+    def __init__(self, volume_shape: Tuple[int, int, int],
+                 modalities: int = 4, start_channels: int = 32,
+                 num_classes: int = 3, total_iterations: int = 300,
+                 learning_rate: float = 1e-4, weight_decay: float = 1e-5) -> None:
+        """3d Unet with Autoencoder branch for "smoothed" latent space
+
+        Args:
+            volume_shape (Tuple[int, int, int]): input volume shape without batch, channel.
+                                                 If cropped, specify cropped shape
+            modalities (int, optional): MRI modes as channels. Defaults to 4.
+            start_channels (int, optional): First channels before U-Net Down. Defaults to 32.
+            num_classes (int, optional): Number of output classes. Defaults to 3.
+            total_iterations (int, optional): Max Epoch. Defaults to 300.
+            learning_rate (float, optional): LR at t0. Defaults to 1e-4.
+            weight_decay (float, optional): parameter regularization. Defaults to 1e-5.
+        """        
         super().__init__()
         self.encoder = Encoder(modalities=modalities, start_channels=start_channels)
         self.decoder = Decoder(in_channels=start_channels*8, num_classes=num_classes)

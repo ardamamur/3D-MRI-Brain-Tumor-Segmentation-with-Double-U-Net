@@ -8,12 +8,19 @@ from src.models.UNet3D_v1 import *
 from src.models.double_u_net import *
 from losses.BCEDiceLoss import BCEDiceLoss
 
-from monai.metrics.meandice import compute_dice
-from monai.metrics.hausdorff_distance import compute_hausdorff_distance
+class DoubleUnetLightning(pl.LightningModule):
+    def __init__(self, modalities: int = 4, num_classes: int = 3,
+                 total_iterations: int = 300, learning_rate: float = 1e-4,
+                 weight_decay: float = 1e-5) -> None:
+        """Double Unet own adaptions
 
-class UNet3D_Lightning(pl.LightningModule):
-    def __init__(self, modalities=4, num_classes=3,
-                 total_iterations=300, learning_rate=1e-4, weight_decay=1e-5) -> None:
+        Args:
+            modalities (int, optional): MRI modes as channels. Defaults to 4.
+            num_classes (int, optional): number of output channels. Defaults to 3.
+            total_iterations (int, optional): max epochs. Defaults to 300.
+            learning_rate (float, optional): LR at t0. Defaults to 1e-4.
+            weight_decay (float, optional): parameter regularization. Defaults to 1e-5.
+        """
         super().__init__()
         self.model_type = "double_unet"
         self.model =  DoubleUNet3d(in_channels=modalities,
