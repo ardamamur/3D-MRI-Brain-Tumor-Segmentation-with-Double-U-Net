@@ -34,6 +34,10 @@ tumors in multi-modal magnetic resonance imaging (MRI) scans.
 
 [Medical Net](https://github.com/Tencent/MedicalNet) 
 
+https://github.com/doublechenching/brats_segmentation-pytorch
+
+[MedicalZooPytorch](https://github.com/black0017/MedicalZooPytorch)
+
 
 ## License
 
