@@ -1,8 +1,7 @@
 trainer:
-  default_root_dir: /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/Unet/01
-ckpt_path: null
+  default_root_dir: /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/VAE/01
 model:
-  class_path: src.lightningmodules.UnetLightning.UnetLightning
+  class_path: src.lightningmodules.VAELightning.VAELightning
   init_args:
     modalities: 4
     start_channels: 16
@@ -14,4 +13,4 @@ model:
       - 160
       - 192
       - 128
-ckpt_path: null
+ckpt_path: /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/VAE/01/lightning_logs/version_2590/checkpoints/last.ckpt

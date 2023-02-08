@@ -71,12 +71,12 @@ class BraTSLightning(pl.LightningModule):
         metrics = self.inference_with_metrics(batch)
         return metrics
 
-    def test_step_end(self, outputs):
+    def test_epoch_end(self, outputs):
         # use some file writing in future
         metrics =  self.aggregate_metrics(outputs)
         print(f"Dice_Scores:")
-        for i in range(len(self.channel_to_class)):
-            print(f"{self.channel_to_class[i]}: {metrics['val_dice_coeff'][i]}")
+        for k in metrics['val_dice_coeff']:
+            print(f"{k}: {metrics['val_dice_coeff'][k].item()}")
         print(f"Hausdorff Distances:")
-        for i in range(len(self.channel_to_class)):
-            print(f"{self.channel_to_class[i]}: {metrics['val_hausdorff'][i]}")
+        for k in metrics['val_hausdorff']:
+            print(f"{k}: {metrics['val_hausdorff'][k].item()}")
