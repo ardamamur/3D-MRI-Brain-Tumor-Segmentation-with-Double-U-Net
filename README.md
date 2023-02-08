@@ -29,7 +29,9 @@ For this project, we need a dataset of 3D MRI Brain images. For that we decided 
 use the Brain Tumor Segmentation (BraTS) Challenge dataset. BraTS has always been
 focusing on the evaluation of state-of-the-art methods for the segmentation of brain
 tumors in multi-modal magnetic resonance imaging (MRI) scans.
-1
+## Reference Repositories
+[BraTS20 3DUnet 3D Auto Encoder](https://www.kaggle.com/code/polomarco/brats20-3dunet-3dautoencoder/notebook) 
+[Medical Net](https://github.com/Tencent/MedicalNet) 
 
 
 ## License
