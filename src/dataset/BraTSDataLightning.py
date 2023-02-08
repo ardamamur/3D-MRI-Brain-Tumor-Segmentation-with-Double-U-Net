@@ -4,7 +4,7 @@ import json
 from src.dataset.BraTSDataset import BraTSDataset
 from torch.utils.data import DataLoader
 
-class MNISTDataModule(pl.LightningDataModule):
+class BraTSDataLightning(pl.LightningDataModule):
     def __init__(self, split: int, data_dir: str = "/cluster/51/emre/project/data/RSNA_ASNR_MICCAI_BraTS2021_TrainingData_16July2021",
                  split_file: str = "/cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/splits/datasplit.json",
                  batch_size: int = 1,
@@ -43,7 +43,7 @@ class MNISTDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         valdata = BraTSDataset(self.data_dir, crop_size=self.crop_size,
-                                 training=False,
+                                 training=True,
                                  patientsdir=self.val_patients)
         return DataLoader(valdata, batch_size=self.batch_size,
                           shuffle=False, num_workers=16, pin_memory=True)
