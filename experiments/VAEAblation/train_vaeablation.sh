@@ -1,0 +1,1 @@
+python train.py fit --config /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/global_configs/config.yml --config /cluster/51/emre/project/3D-MRI-Brain-Tumor-Segmentation-with-Double-U-Net/experiments/VAEAblation/vae_ablation_train.yml
