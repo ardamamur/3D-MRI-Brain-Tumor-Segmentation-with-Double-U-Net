@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -112,7 +113,7 @@ class Decoder2(nn.Module):
         self.dec2 = Up(256+ 128+ self.in_channels*64, 128)
         self.dec3 = Up(128+ 64+ self.in_channels*64, 64)
         self.dec4 = Up(80+ self.in_channels, 32)
-        self.out = un.Out(32, n_classes)
+        self.out = un.Out(32, 16)
 
     def forward(self, x, skip_layers1, skip_layers2):
         x1 = self.dec1(x,skip_layers1[3],skip_layers2[3])
@@ -148,8 +149,9 @@ class DoubleUNet3d(nn.Module):
         out1 = self.dec1(x1, skip_layers1)
         x3 = torch.mul(out1, x)
         x4, skip_layers2 = self.enc2(x3)
-        out2 = self.dec2(x4,skip_layers1,skip_layers2) 
-        out = torch.cat([out2, out1],dim=1)
+        out2 = self.dec2(x4,skip_layers1,skip_layers2) # out_channel = 16
+        out = torch.cat([out2, out1],dim=1) # out_channel = 17
+        #mask = self.out_conv(out)
         mask = self.conv(out)
         
         return out1, mask
